@@ -5372,11 +5372,16 @@ registerProcessor('pocket-six', PocketSix);
       ${c === 'god' ? `<div class="confirm"><p>God mode replaces this save with a new world where everything is unlocked and maxed: 455 balls of every type, 99,999 ◆ and a quadrillion bits, so you can push the music. Copy a save code first if you want this one back.</p>
         <div class="actions"><button type="button" class="btn gold" data-act="do-god">Start god mode</button><button type="button" class="btn" data-act="cancel">Cancel</button></div></div>`
         : `<div class="actions"><button type="button" class="btn" data-act="god">God mode</button></div>`}
-      <div class="group-h">Start over</div>
+      <div class="group-h">Redig this depth</div>
       <p class="note">A fresh world at this same depth. You keep your stars, perks and Journal; you lose this world's bits, balls and upgrades.</p>
       ${c === 'wipe' ? `<div class="confirm">${this.restartText()}
-        <div class="actions"><button type="button" class="btn danger" data-act="do-wipe">Start a new world</button><button type="button" class="btn" data-act="cancel">Keep playing</button></div></div>`
-        : `<div class="actions"><button type="button" class="btn danger" data-act="wipe">Start over</button></div>`}
+        <div class="actions"><button type="button" class="btn danger" data-act="do-wipe">Dig the new world</button><button type="button" class="btn" data-act="cancel">Keep playing</button></div></div>`
+        : `<div class="actions"><button type="button" class="btn danger" data-act="wipe">Redig</button></div>`}
+      <div class="group-h">New game</div>
+      <p class="note">Erase this save and start from the very beginning: depth 0, no stars, no perks, an empty Journal. Your settings and ball sounds stay.</p>
+      ${c === 'fresh' ? `<div class="confirm"><p>This erases everything: depth ${s.depth}, ${this.starWord(s.stars || 0)}, every perk and every story fragment you've found. It can't be undone. Copy a save code first (above) if you might want this one back.</p>
+        <div class="actions"><button type="button" class="btn danger" data-act="do-fresh">Erase and start fresh</button><button type="button" class="btn" data-act="cancel">Keep playing</button></div></div>`
+        : `<div class="actions"><button type="button" class="btn danger" data-act="fresh">New game</button></div>`}
       <p class="note">Depth ${s.depth}: ${esc(this.depthNote(s.depth))} Seed ${s.seed}</p>
       <div class="group-h">App</div>
       <p class="note">Version ${esc(this.g.build || 'dev')}</p>
@@ -5542,6 +5547,8 @@ registerProcessor('pocket-six', PocketSix);
       case 'close': this.closeModal(); break;
       case 'wipe': this.confirm = 'wipe'; this.buildWorld(); break;
       case 'do-wipe': this.confirm = null; g.newWorld(false); return;
+      case 'fresh': this.confirm = 'fresh'; this.buildWorld(); break;
+      case 'do-fresh': this.confirm = null; g.newGame(); return;
       case 'god': this.confirm = 'god'; this.buildWorld(); break;
       case 'do-god': this.confirm = null; g.godMode(); return;
       case 'cancel': this.confirm = null; this.buildWorld(); break;
@@ -5836,7 +5843,7 @@ registerProcessor('pocket-six', PocketSix);
 // Stonesong: boot, game loop, autosave, and the music.
 (function () {
   const PQ = window.PQ, D = PQ.DATA;
-  const BUILD = '20261029-125544';                       // build.py stamps the build time here
+  const BUILD = '20261029-125801';                       // build.py stamps the build time here
   const $ = id => document.getElementById(id);
   const canvas = $('world');
   const yieldFrame = () => new Promise(r => setTimeout(r, 0));
@@ -5949,6 +5956,17 @@ registerProcessor('pocket-six', PocketSix);
     await saveAll();
     const bonus = next.clearMult > 1 ? ` Clear bonus: ×${+next.clearMult.toFixed(2)} this dig.` : '';
     if (prestige) game.ui.toast(`Depth ${next.depth}. ${game.ui.depthNote(next.depth)}${bonus}`, 5000);
+  };
+
+  // Erase the save and start from nothing, as on a first visit. Only the settings stay.
+  game.newGame = async function () {
+    const next = PQ.newState(newSeed());
+    next.settings = game.state.settings;
+    try { await PQ.Save.clearWorld(); } catch (e) { /* ignore */ }
+    PQ.Save.saveMeta(next);
+    await boot(next, false);
+    await saveAll();
+    game.ui.welcome();
   };
 
   // Replace this save with a god-mode one (sim.js godState) in a brand new world.
