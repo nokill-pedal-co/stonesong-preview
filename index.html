@@ -447,6 +447,19 @@ textarea {
 .chip.mute { width: 44px; min-width: 44px; height: 36px; padding: 0; display: grid; place-items: center; }
 .chip.mute svg { width: 20px; height: 20px; }
 .chip.mute.off { color: var(--muted); border-style: dashed; }
+.hud-right { position: relative; }
+.vol-pop {
+  position: absolute; right: 0; top: 44px; z-index: 5;
+  display: flex; align-items: center; gap: 10px;
+  width: min(280px, calc(100vw - 32px)); padding: 8px 12px 8px 8px;
+  background: var(--panel); border: 1px solid var(--line);
+}
+.vol-pop input { flex: 1; min-width: 0; height: 36px; accent-color: var(--gold); }
+.vol-pop[hidden] { display: none; }
+.vol-val { width: 3ch; text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); font-size: 13px; }
+.chip.vol-mute { width: 44px; min-width: 44px; height: 36px; padding: 0; display: grid; place-items: center; }
+.chip.vol-mute svg { width: 20px; height: 20px; }
+.chip.vol-mute.off { color: var(--muted); border-style: dashed; }
 .fx-live { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; max-width: 60vw; }
 .fx-live:empty { display: none; }
 .fx-chip { padding: 2px 7px; border: 1px solid var(--c); color: var(--c); font: 500 14px/1.3 var(--display); background: rgba(8, 11, 9, 0.7); font-variant-numeric: tabular-nums; }
@@ -512,8 +525,13 @@ body.listening .hud > * { pointer-events: none; }
   </div>
   <div class="hud-right">
     <div class="hud-top">
-      <button class="chip mute" id="btnMute" type="button" aria-pressed="false" aria-label="Mute the music" title="Mute the music"></button>
+      <button class="chip mute" id="btnMute" type="button" aria-expanded="false" aria-controls="volPop" aria-label="Sound" title="Sound"></button>
       <div class="ballcount"><span id="ballCount">1</span> <small>balls</small></div>
+    </div>
+    <div class="vol-pop" id="volPop" role="group" aria-label="Sound" hidden>
+      <button class="chip vol-mute" id="volMute" type="button" aria-pressed="false"></button>
+      <input type="range" id="volSlider" min="0" max="100" aria-label="Volume">
+      <span class="vol-val" id="volVal" aria-hidden="true"></span>
     </div>
     <div class="mini-btns">
       <button class="chip" id="btnDrop" type="button" title="Jump to the launcher">Launcher</button>
@@ -4306,19 +4324,45 @@ registerProcessor('pocket-six', PocketSix);
       if (game.ui) game.ui.toast('Saved ' + name, 3600);
     }
 
-    // The mute button on the main screen: the same switch as "Music from the balls".
+    // The sound button on the main screen opens a little panel: mute (the same switch as
+    // "Music from the balls") and the volume (the same as the World tab's slider).
     const SPEAKER = '<path d="M3 8h3l4-3v10l-4-3H3z"/>';
     const ICON_ON = SPEAKER + '<path d="M13 7.5a3.5 3.5 0 0 1 0 5M15.5 5a7 7 0 0 1 0 10"/>';
     const ICON_OFF = SPEAKER + '<path d="M13 8l4 4M17 8l-4 4"/>';
+    const svg = body => `<svg viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${body}</svg>`;
+    const volume = () => Math.round((st().vol == null ? 0.8 : st().vol) * 100);
     function muteButton() {
-      const b = $('btnMute'), off = st().sound === false, label = off ? 'Turn the music on' : 'Mute the music';
-      b.innerHTML = `<svg viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${off ? ICON_OFF : ICON_ON}</svg>`;
-      b.setAttribute('aria-pressed', off); b.setAttribute('aria-label', label); b.title = label;
+      const off = st().sound === false, b = $('btnMute'), mb = $('volMute');
+      b.innerHTML = svg(off ? ICON_OFF : ICON_ON);
       b.classList.toggle('off', off);
+      mb.innerHTML = svg(off ? ICON_OFF : ICON_ON);
+      mb.classList.toggle('off', off);
+      mb.setAttribute('aria-pressed', off);
+      mb.setAttribute('aria-label', off ? 'Turn the music on' : 'Mute the music');
+      mb.title = mb.getAttribute('aria-label');
+      $('volSlider').value = volume(); $('volVal').textContent = volume();
       const box = $('optSound');
       if (box) box.checked = !off;
     }
-    $('btnMute').addEventListener('click', () => { m.set('sound', st().sound === false); muteButton(); });
+    function showVolume(open) {
+      $('volPop').hidden = !open;
+      $('btnMute').setAttribute('aria-expanded', open);
+      if (open) muteButton();
+    }
+    $('btnMute').addEventListener('click', () => showVolume($('volPop').hidden));
+    $('volMute').addEventListener('click', () => m.set('sound', st().sound === false));
+    $('volSlider').addEventListener('input', e => {
+      const v = +e.target.value;
+      m.set('vol', v / 100);
+      $('volVal').textContent = v;
+      if (v > 0 && st().sound === false) m.set('sound', true);   // turning it up means you want to hear it
+      const w = $('optVol');
+      if (w) w.value = v;
+    });
+    // A tap anywhere else closes it.
+    document.addEventListener('pointerdown', e => {
+      if (!$('volPop').hidden && !e.target.closest('#volPop, #btnMute')) showVolume(false);
+    }, true);
     m.muteButton = muteButton;
     muteButton();
 
@@ -6077,7 +6121,7 @@ registerProcessor('pocket-six', PocketSix);
 // Stonesong: boot, game loop, autosave, and the music.
 (function () {
   const PQ = window.PQ, D = PQ.DATA;
-  const BUILD = '20261029-133702';                       // build.py stamps the build time here
+  const BUILD = '20261029-140926';                       // build.py stamps the build time here
   const $ = id => document.getElementById(id);
   const canvas = $('world');
   const yieldFrame = () => new Promise(r => setTimeout(r, 0));
