@@ -5132,7 +5132,7 @@ registerProcessor('pocket-six', PocketSix);
 
 </script>
 <script>
-// Pixel Quarry: the DOM layer. HUD, shop sheet, toasts and dialogs.
+// Stonesong: the DOM layer. HUD, shop sheet, toasts and dialogs.
 (function () {
   const PQ = window.PQ;
   const D = PQ.DATA, BALLS = D.BALLS;
@@ -5580,16 +5580,18 @@ registerProcessor('pocket-six', PocketSix);
   U.closeModal = function () { $('modal').hidden = true; };
 
   U.welcome = function () {
-    this.modal(`<h2>Somewhere out in the dark is one Golden Pixel.</h2>
-      <p>You start in a small cave in the middle of 10,000,000 pixels. Your balls bounce around and break rock, and every broken pixel pays bits.</p>
+    this.modal(`<h2>The rock is singing.</h2>
+      <p>Somewhere in this dark quarry is one Golden Pixel, and every sound down here bends toward it. Your balls bounce through the crystal, and every pixel they break plays a note and pays bits.</p>
       <ul>
-        <li>Spend bits on more balls. The green arrow is your launcher: new balls fire from it.</li>
+        <li>Spend bits on more balls. Each kind plays its own instrument. The green arrow is your launcher: new balls fire from it.</li>
+        <li>The cave is dark. Wherever a note plays, the rock lights up.</li>
         <li>Tap open space to aim the launcher. Hold on open space to move it.</li>
         <li>Tap glowing rock to dig it yourself. Hold to keep digging.</li>
         <li>Magenta specks are upgrade pixels. Any ball that touches one collects ◆ for the Tree.</li>
-        <li>Relics are buried in the dark. Some hold pieces of a story.</li>
+        <li>Crystal relics grow in the dark. Some hold pieces of a story.</li>
+        <li>Best with sound on, and better with headphones. The speaker at the top mutes it.</li>
       </ul>
-      <div class="actions"><button type="button" class="btn gold" data-act="close">Start digging</button></div>`);
+      <div class="actions"><button type="button" class="btn gold" data-act="close">Start the song</button></div>`);
   };
 
   // A newly unlocked ball type, introduced.
@@ -5631,7 +5633,7 @@ registerProcessor('pocket-six', PocketSix);
   U.gold = function () {
     const s = this.g.state;
     this.modal(`<h2>You found the Golden Pixel.</h2>
-      <p class="sub">One pixel out of 10,000,000, after ${fmtTime(s.foundTime)} in this world. It pays a finder's fee of</p>
+      <p class="sub">The note the whole quarry was tuned to, found after ${fmtTime(s.foundTime)} in this world. It pays a finder's fee of</p>
       <div class="big">+${fmt(s.goldReward)}</div>
       <p>Go deeper to collect ${this.starWord(D.DEPTH.stars(s.depth))}. Every star adds +${D.STAR_BONUS * 100}% bits for good, and you can spend them on perks in the Stars tab. Depth ${s.depth + 1}: ${esc(this.depthNote(s.depth + 1))}</p>
       <p>${esc(this.clearText())}</p>
@@ -5834,7 +5836,7 @@ registerProcessor('pocket-six', PocketSix);
 // Stonesong: boot, game loop, autosave, and the music.
 (function () {
   const PQ = window.PQ, D = PQ.DATA;
-  const BUILD = '20261029-115933';                       // build.py stamps the build time here
+  const BUILD = '20261029-125544';                       // build.py stamps the build time here
   const $ = id => document.getElementById(id);
   const canvas = $('world');
   const yieldFrame = () => new Promise(r => setTimeout(r, 0));
@@ -6043,7 +6045,7 @@ registerProcessor('pocket-six', PocketSix);
       PQ.Save.saveMeta(state);
       game.ui.modal(`<p class="kicker">The quarry has changed</p>
         <h2>A new world, in the dark.</h2>
-        <p>Pixel Quarry was rebuilt: you now start in a cave in the middle of everything, ball upgrades live in a skill tree paid with ◆ from magenta upgrade pixels, and relics hold pieces of a story.</p>
+        <p>The quarry was rebuilt: you now start in a cave in the middle of everything, ball upgrades live in a skill tree paid with ◆ from magenta upgrade pixels, and relics hold pieces of a story.</p>
         <p class="sub">Your old world could not come along. Your depth, stars and perks did.</p>
         <div class="actions"><button type="button" class="btn gold" data-act="close">Start digging</button></div>`);
     } else if (meta) {
