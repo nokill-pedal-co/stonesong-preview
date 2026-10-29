@@ -698,7 +698,7 @@ body.listening .hud > * { pointer-events: none; }
     FOG: 4,                                 // fog-of-war cell edge, world px (code shifts by 2: keep it 4)
     SIGHT: 20,                              // how far a ball lights up the rock around it, px
     RELIC_REWARD_S: 30,                     // a relic find pays this many seconds of income
-    RELIC_SHOW: 0.8,                        // once this much of a relic's outline is seen, all of it shows
+    RELIC_SHOW: 0.65,                       // once this much of a relic's outline is seen, all of it shows
     TYPE_MASK: 0x0f,
     POISON: 0x80,
 
@@ -6158,7 +6158,7 @@ registerProcessor('pocket-six', PocketSix);
 // Stonesong: boot, game loop, autosave, and the music.
 (function () {
   const PQ = window.PQ, D = PQ.DATA;
-  const BUILD = '20261029-160005';                       // build.py stamps the build time here
+  const BUILD = '20261029-160148';                       // build.py stamps the build time here
   const $ = id => document.getElementById(id);
   const canvas = $('world');
   const yieldFrame = () => new Promise(r => setTimeout(r, 0));
