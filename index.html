@@ -696,7 +696,7 @@ body.listening .hud > * { pointer-events: none; }
       { id: 7,  key: 'copper',   name: 'Copper',    hp: 6,   val: 60,  col: [64, 224, 228] },
       { id: 8,  key: 'silver',   name: 'Silver',    hp: 20,  val: 400, col: [130, 176, 255] },
       { id: 9,  key: 'amethyst', name: 'Amethyst',  hp: 50,  val: 3000, col: [168, 112, 255] },
-      { id: 10, key: 'relic',    name: 'Relic',     hard: true,         col: [236, 232, 218] },
+      { id: 10, key: 'relic',    name: 'Relic',     hard: true,         col: [214, 228, 255] },
       { id: 11, key: 'gold',     name: 'Golden Pixel', hp: 200, val: 0, col: [255, 206, 46] },
       // Deep rock: only in worlds past the first (see DEPTH). hp tops out at 255, the dmg byte.
       { id: 12, key: 'magma',    name: 'Ashrock',   hp: 210, val: 420, col: [206, 208, 218] },
@@ -1114,8 +1114,8 @@ body.listening .hud > * { pointer-events: none; }
 
 </script>
 <script>
-// Pixel Quarry: relics. Each one is a 2D distance field, drawn into the world as glowing
-// white line art: its outline, plus any inner lines the shape defines. Relic cells are
+// Stonesong: relics, crystal formations. Each one is a 2D distance field, drawn into the world as glowing
+// line art: its outline, plus any inner lines the shape defines. Relic cells are
 // unbreakable. Rock sealed inside an outline is hollowed out by the world afterwards.
 (function () {
   const root = typeof window !== 'undefined' ? window : globalThis;
@@ -1145,136 +1145,116 @@ body.listening .hud > * { pointer-events: none; }
   }
   const noise = (x, y, s) => PQ.World.vnoise(x, y, s);
 
-  // ---- the relics; coordinates are px at scale 1, origin at the centre ----
-  const KINDS = [
-    {
-      name: 'Femur', weight: 3, hw: 78, hh: 24, tilt: Math.PI,
+  // A polygon's distance field (points as a flat [x0, y0, x1, y1, ...] list).
+  function poly(x, y, P) {
+    const n = P.length / 2;
+    let d = (x - P[0]) * (x - P[0]) + (y - P[1]) * (y - P[1]), s = 1;
+    for (let i = 0, j = n - 1; i < n; j = i, i++) {
+      const ex = P[2 * j] - P[2 * i], ey = P[2 * j + 1] - P[2 * i + 1], wx = x - P[2 * i], wy = y - P[2 * i + 1];
+      const h = clamp((wx * ex + wy * ey) / (ex * ex + ey * ey), 0, 1), bx = wx - ex * h, by = wy - ey * h;
+      d = Math.min(d, bx * bx + by * by);
+      const c1 = y >= P[2 * i + 1], c2 = y < P[2 * j + 1], c3 = ex * wy > ey * wx;
+      if ((c1 && c2 && c3) || (!c1 && !c2 && !c3)) s = -s;
+    }
+    return s * Math.sqrt(d);
+  }
+  const seg = (x, y, q) => capsule(x, y, q[0], q[1], q[2], q[3], 0, 0);
+
+  // One crystal point: a prism from a base at (ax, ay) growing along angle `ang` (0 = up),
+  // half-width w, with a pointed tip `tip` long. Its facet edges become inner lines.
+  function prism(ax, ay, ang, len, w, tip) {
+    const ux = Math.sin(ang), uy = -Math.cos(ang), vx = -uy, vy = ux, s = len - tip;
+    const P = (a, b) => [ax + ux * a + vx * b, ay + uy * a + vy * b];
+    const k = w * 0.35;
+    return {
+      poly: [...P(0, -w), ...P(s, -w), ...P(len, 0), ...P(s, w), ...P(0, w)],
+      segs: [[...P(0, -k), ...P(s, -k)], [...P(s, -k), ...P(len, 0)], [...P(0, k), ...P(s, k)], [...P(s, k), ...P(len, 0)]],
+    };
+  }
+  // A formation from prisms and other polygons, plus any extra distance field (rock it grows from).
+  function formation(parts, extra, lines) {
+    const polys = parts.map(p => p.poly || p), segs = [].concat(...parts.map(p => p.segs || [])).concat(lines || []);
+    return {
       sdf(x, y) {
-        const yb = y - 4 * (1 - (x / 62) * (x / 62));            // a slight bow in the shaft
-        let d = capsule(x, yb, -48, 0, 48, 0, 6.5, 7);
-        d = smin(d, capsule(x, y, -50, 0, -62, -7, 7, 8), 5);      // neck
-        d = smin(d, circle(x, y, -65, -9, 11.5), 4);              // head
-        d = smin(d, circle(x, y, -55, 8, 8), 5);                  // trochanter
-        d = smin(d, box(x, y, 54, 1, 6, 12, 4), 6);
-        d = smin(d, circle(x, y, 61, -6, 10.5), 5);               // condyles
-        d = smin(d, circle(x, y, 62, 8, 10.5), 5);
-        return Math.max(d, -ellipse(x, y, 67, 1, 3.5, 2.5));      // notch between condyles
+        let d = extra ? extra(x, y) : 1e9;
+        for (const P of polys) d = Math.min(d, poly(x, y, P));
+        return d;
       },
-    },
-    {
-      name: 'Spine and ribs', weight: 2, hw: 84, hh: 74, tilt: 0.5,
+      line(x, y) {
+        for (const q of segs) if (seg(x, y, q) < 0.8) return true;
+        return false;
+      },
+    };
+  }
+
+  // ---- the relics: crystal formations; coordinates are px at scale 1, origin at the centre ----
+  // Each keeps the weight and size (hw, hh) of the relic it replaced, so the relics, and the
+  // Golden Pixel placed around them, land exactly where they did in worlds already under way.
+  const KINDS = [
+    Object.assign({ name: 'Quartz needle', weight: 3, hw: 78, hh: 24, tilt: Math.PI }, formation([
+      { poly: [-78, 0, -60, -12, 60, -12, 78, 0, 60, 12, -60, 12],
+        segs: [[-60, -4, 60, -4], [-60, 4, 60, 4], [-60, -4, -78, 0], [-60, 4, -78, 0], [60, -4, 78, 0], [60, 4, 78, 0]] },
+      prism(22, -10, 0.55, 16, 4, 6),
+      prism(-30, 10, Math.PI + 0.5, 13, 3.5, 5),
+    ])),
+    Object.assign({ name: 'Crystal cluster', weight: 2, hw: 84, hh: 74, tilt: 0.5 }, formation(
+      [[-1.05, 52, 8], [-0.7, 78, 9], [-0.35, 98, 10], [0.02, 112, 11], [0.38, 92, 10], [0.72, 70, 9], [1.08, 48, 7]]
+        .map(([a, len, w], i) => prism((i - 3) * 9, 50, a, len, w, w * 1.8)),
+      (x, y) => ellipse(x, y, 0, 56, 70, 16) + 3 * (noise(x / 6, y / 6, 5) - 0.5))),
+    Object.assign({ name: 'Stone organ', weight: 2, hw: 74, hh: 40, tilt: 0.6 }, {
+      // Dripstone pipes hanging from a ledge, short to long and back, like an organ's.
       sdf(x, y) {
-        let d = 1e9;
-        for (let i = 0; i < 7; i++) {
-          const vx = -66 + i * 21, vy = -40 + 5 * Math.sin(i * 0.7);
-          if (x < vx - 16 || x > vx + 38) continue;               // too far to matter
-          const L = 1.15 - Math.abs(i - 3) * 0.1;                  // middle ribs longest
-          if (x < vx + 16) {
-            d = Math.min(d, box(x, y, vx, vy, 9, 7, 3.5));        // vertebra
-            d = smin(d, capsule(x, y, vx, vy - 5, vx + 7, vy - 21, 3.6, 1.8), 3);   // spinous process
-          }
-          if (x < vx - 10 || y < vy - 8) continue;
-          // A rib arcs out from the spine and sweeps back as it drops.
-          let r = 1e9, px = vx + 3, py = vy + 4;
-          for (let k = 1; k <= 5; k++) {
-            const a = 0.15 + k * 0.32, nx = vx + 3 + Math.sin(a) * 26 * L - k * 2, ny = vy + 4 + (1 - Math.cos(a)) * 40 * L + k * 8 * L;
-            r = smin(r, capsule(x, y, px, py, nx, ny, 3.3 - k * 0.3, 3.3 - (k + 1) * 0.3), 2.5);
-            px = nx; py = ny;
-          }
-          d = Math.min(d, r);
+        let d = box(x, y, 0, -32, 72, 6, 3) + 2 * (noise(x / 5, y / 5, 9) - 0.5);
+        for (let i = 0; i < 9; i++) {
+          const px = -60 + i * 15, L = 26 + 38 * Math.sin((i + 0.5) / 9 * Math.PI);
+          d = smin(d, capsule(x, y, px, -28, px, -28 + L, 5.5, 1.4), 2);
         }
         return d;
       },
-    },
+      line(x, y) { return Math.abs(y + 22) < 0.7 && Math.abs(x) < 66; },
+    }),
     {
-      name: 'Canid skull', weight: 2, hw: 74, hh: 40, tilt: 0.6,
+      name: 'Geode', weight: 2, hw: 58, hh: 54, tilt: Math.PI,
+      // A rough shell, broken open: crystal teeth line the hollow, agate bands run round it.
       sdf(x, y) {
-        let d = ellipse(x, y, 20, -8, 40, 27);                    // braincase
-        d = smin(d, circle(x, y, 52, -2, 15), 8);                 // back of the skull
-        d = smin(d, capsule(x, y, -6, 0, -62, 10, 19, 8), 10);    // muzzle
-        d = smin(d, capsule(x, y, 0, -34, 50, -22, 2.5, 2), 4);   // sagittal crest
-        d = smin(d, capsule(x, y, -12, 10, 30, 12, 5, 4), 4);     // cheekbone
-        d = Math.max(d, -circle(x, y, -6, -8, 10));               // eye socket
-        d = Math.max(d, -ellipse(x, y, -64, 6, 5, 4));            // nostril
-        d = Math.min(d, capsule(x, y, -46, 14, -49, 31, 4, 1.2)); // canine
-        for (let i = 0; i < 5; i++) {
-          const tx = -35 + i * 9;
-          d = Math.min(d, capsule(x, y, tx, 15, tx + 1, i === 3 ? 26 : 22, 3.4, 1.2));
-        }
-        let j = capsule(x, y, -58, 31, 26, 31, 5.5, 8);           // lower jaw
-        j = smin(j, capsule(x, y, 26, 31, 40, 14, 8, 7), 6);
-        j = smin(j, circle(x, y, 43, 27, 6), 3);
-        for (let i = 0; i < 4; i++) j = Math.min(j, capsule(x, y, -40 + i * 11, 26, -40 + i * 11, 21, 3, 1.2));
-        return Math.min(d, j);
+        const outer = ellipse(x, y, 0, 0, 56, 52) + 3 * (noise(x / 6, y / 6, 13) - 0.5);
+        const th = Math.atan2(y, x), f = th * 18 / (2 * Math.PI);
+        const tooth = Math.abs(f - Math.floor(f) - 0.5) * 2;           // 0 at a point's tip .. 1 between
+        return Math.max(outer, -(ellipse(x, y, 0, 0, 38, 35) + 9 * (1 - tooth)));
       },
+      line(x, y) { return Math.abs(ellipse(x, y, 0, 0, 47, 43)) < 0.8; },
     },
-    {
-      name: 'Ammonite', weight: 2, hw: 58, hh: 54, tilt: Math.PI,
-      sdf(x, y) { return ellipse(x, y, 0, 0, 56, 52) + 1.5 * (noise(x / 5, y / 5, 11) - 0.5); },
-      line(x, y) {                                               // the seam between whorls
-        const r = hyp(x, y) + 0.01, th = Math.atan2(y, x);
-        let f = (Math.log(r / 2.5) / 0.16 - th) / (2 * Math.PI);
-        f -= Math.floor(f);
-        return r > 4 && Math.min(f, 1 - f) * 2 * Math.PI * 0.16 * r < 0.8;   // ~1.6 px wide at any radius
-      },
-    },
-    {
-      name: 'Iron anchor', weight: 1, hw: 60, hh: 78, tilt: 0.9,
-      sdf(x, y) {
-        let d = box(x, y, 0, -2, 4.5, 46, 2);                     // shank
-        d = Math.min(d, ring(x, y, 0, -60, 11, 3.5));             // ring
-        d = Math.min(d, box(x, y, 0, -38, 30, 4, 2), circle(x, y, -31, -38, 5), circle(x, y, 31, -38, 5));
-        d = smin(d, Math.max(ring(x, y, 0, 0, 44, 5), 12 - y), 4); // arms
-        d = Math.min(d, capsule(x, y, -40, 22, -50, 3, 9, 2), capsule(x, y, 40, 22, 50, 3, 9, 2));
-        return smin(d, circle(x, y, 0, 44, 7), 4);                // crown
-      },
-    },
-    {
-      name: 'Bronze gear', weight: 1, hw: 50, hh: 50, tilt: Math.PI,
-      sdf(x, y) {
-        const r = hyp(x, y), th = Math.atan2(y, x);
-        const tooth = clamp((Math.cos(th * 12) + 0.15) * 2.2, 0, 1) * 7;
-        let d = r - (39 + tooth);
-        d = Math.max(d, 9 - r);                                   // axle hole
-        const win = Math.max(Math.abs(r - 24) - 7.5, (Math.cos(th * 5) - 0.35) * r * 0.45);
-        return Math.max(d, -win);                                  // windows between spokes
-      },
-      line(x, y) { const r = hyp(x, y); return Math.abs(r - 31) < 0.8 || Math.abs(r - 15) < 0.8; },   // rim and hub
-    },
-    {
-      name: 'Amphora', weight: 1, hw: 40, hh: 70, tilt: 1.2,
-      sdf(x, y) {
-        let d = ellipse(x, y, 0, 8, 29, 42);
-        d = smin(d, box(x, y, 0, -40, 9, 14, 3), 8);
-        d = Math.min(d, box(x, y, 0, -55, 13, 3.5, 2));
-        for (const s of [-1, 1]) {
-          let hnd = capsule(x, y, s * 9, -48, s * 22, -46, 3, 3);
-          hnd = smin(hnd, capsule(x, y, s * 22, -46, s * 26, -26, 3, 3.2), 3);
-          d = smin(d, hnd, 3);
-        }
-        d = smin(d, capsule(x, y, 0, 46, 0, 64, 9, 4), 6);         // foot
-        return Math.max(d, -(circle(x, y, 33, -8, 15) + 4 * (noise(x / 3, y / 3, 7) - 0.5)));   // broken side
-      },
-      line(x, y) { return Math.abs(y + 17.5) < 0.7 || Math.abs(y - 19.5) < 0.7; },   // painted bands
-    },
-    {
-      name: 'Sword', weight: 1, hw: 94, hh: 20, tilt: Math.PI,
-      sdf(x, y) {
-        let d = capsule(x, y, -58, 0, 64, 0, 7, 1.2);              // blade
-        d = Math.min(d, box(x, y, -62, 0, 3.5, 17, 2));            // crossguard
-        d = Math.min(d, capsule(x, y, -66, 0, -82, 0, 3.2, 3.2));  // grip
-        return Math.min(d, circle(x, y, -87, 0, 5.5));             // pommel
-      },
-      line(x, y) { return x > -55 && x < 56 && Math.abs(y) < 0.6; },   // fuller
-    },
-    {
-      name: 'Pawprint slab', weight: 1, hw: 50, hh: 46, tilt: 0.7,
-      sdf(x, y) { return box(x, y, 0, 0, 46, 42, 12) + 5 * (noise(x / 7, y / 7, 3) - 0.5); },
-      line(x, y) {                                               // the paw's pads
-        const pad = (cx, cy, rx, ry) => Math.abs(ellipse(x, y, cx, cy, rx, ry)) < 0.9;
-        return pad(0, 14, 17, 13) || pad(-22, -10, 7, 9) || pad(-8, -23, 7, 9) || pad(8, -23, 7, 9) || pad(22, -10, 7, 9);
-      },
-    },
+    Object.assign({ name: 'Dripstone', weight: 1, hw: 60, hh: 78, tilt: 0.9 }, formation([
+      // A stalactite and a stalagmite growing toward each other, not quite touching; the lines
+      // across them are growth rings.
+      { poly: [-20, -66, 20, -66, 3, -10, 0, -5, -3, -10], segs: [[-12, -50, 12, -50], [-7, -34, 7, -34], [-3.5, -22, 3.5, -22]] },
+      { poly: [-42, -66, -28, -66, -34, -40] },
+      { poly: [30, -66, 42, -66, 36, -48] },
+      { poly: [-26, 66, 26, 66, 4, 12, 0, 7, -4, 12], segs: [[-17, 52, 17, 52], [-10, 36, 10, 36], [-5, 24, 5, 24]] },
+      { poly: [24, 66, 40, 66, 32, 42] },
+      { poly: [-50, -70, -30, -76, 30, -76, 50, -70, 30, -63, -30, -63] },   // the rock they hang from
+      { poly: [-54, 70, -30, 63, 30, 63, 54, 70, 30, 76, -30, 76] },        // and grow up from
+    ])),
+    Object.assign({ name: 'Desert rose', weight: 1, hw: 50, hh: 50, tilt: Math.PI }, formation(
+      // Blades of crystal crossing at the middle, like the petals of a rose.
+      [0, 1, 2, 3, 4, 5].map(k => {
+        const a = k * Math.PI / 6, ca = Math.cos(a), sa = Math.sin(a), L = k % 2 ? 40 : 47, w = k % 2 ? 9 : 11;
+        return { poly: [L * ca, L * sa, -w * sa, w * ca, -L * ca, -L * sa, w * sa, -w * ca], segs: [[L * ca * 0.8, L * sa * 0.8, L * ca * 0.3, L * sa * 0.3]] };
+      }))),
+    Object.assign({ name: 'Amethyst point', weight: 1, hw: 40, hh: 70, tilt: 1.2 }, formation([
+      prism(2, 60, 0, 128, 17, 34),
+      prism(-16, 58, -0.45, 52, 8, 14),
+      prism(20, 60, 0.5, 38, 6, 11),
+    ], (x, y) => ellipse(x, y, 0, 62, 38, 9) + 3 * (noise(x / 5, y / 5, 8) - 0.5))),
+    Object.assign({ name: 'Selenite blade', weight: 1, hw: 94, hh: 20, tilt: Math.PI }, formation([
+      { poly: [-92, -5, 84, -12, 92, -6, -84, 11], segs: [[-80, -3, 82, -8], [-82, 3, 84, -2], [-84, 8, 86, 2]] },
+      { poly: [-60, 10, 52, 5, 58, 9, -54, 15] },
+    ])),
+    Object.assign({ name: 'Fluorite cube', weight: 1, hw: 50, hh: 46, tilt: 0.7 }, formation([
+      { poly: [0, -44, 38, -22, 38, 22, 0, 44, -38, 22, -38, -22],
+        segs: [[0, 0, 0, 44], [0, 0, -38, -22], [0, 0, 38, -22],
+               [0, -26, 22, -13], [22, -13, 22, 13], [22, 13, 0, 26], [0, 26, -22, 13], [-22, 13, -22, -13], [-22, -13, 0, -26]] },
+    ])),
   ];
   const TOTAL = KINDS.reduce((a, k) => a + k.weight, 0);
 
@@ -1337,7 +1317,7 @@ body.listening .hud > * { pointer-events: none; }
 
 </script>
 <script>
-// Pixel Quarry: the story. Each depth has a chapter, split into fragments that hide in the
+// Stonesong: the story. Each depth has a chapter, split into fragments that hide in the
 // world's relics. Find a relic that carries one and the fragment goes in the Journal; go
 // deeper without finding them all and those pieces of that chapter are lost.
 (function () {
@@ -1346,108 +1326,108 @@ body.listening .hud > * { pointer-events: none; }
 
   const STORY = [
     {
-      title: 'The Foreman’s Log',
+      title: 'The Field Recordist',
       fragments: [
-        'Day 1. The survey says there is nothing down here worth the diesel. The company sent us anyway. Somebody upstairs has seen a photograph.',
-        'Day 4. Hollis swears the rock glows at the edges when the lamps are off. I told him to sleep more. Then I turned my lamp off.',
-        'Day 9. Found bones in the clay. Old ones. The dog will not go near them, so I am not either.',
-        'Day 15. Every crew that worked this site before us is listed in the office binder. Every entry stops mid-sentence.',
-        'Day 22. Juno dug all night on her own. She came back with gold dust in her fur and would not eat.',
-        'Day 30. The company called. They did not ask about the gold. They asked whether we had heard it yet.',
-        'Day 31. We have heard it.',
-        'Day 38. Half the crew left. The other half started digging with their hands.',
-        'Day 40. It is one pixel. The photograph was of one pixel. All this for one.',
-        'Last entry. The floor gave way under the drill and there was another world under it, lit, waiting. I am going down. Juno went first.',
+        'Day 1. They hired me to record the quarry for a film about silence. Nobody told me what was down here.',
+        'Day 3. With the machines off, the rock hums. Low, under hearing. My meters say it is there. My ears agree.',
+        'Day 6. Each kind of rock has its own pitch. The soft green stuff sits high, the red sits low. I have started labelling samples by note instead of by name.',
+        'Day 10. Something sings back. When I play a tape into the tunnel, the tunnel answers a fifth higher.',
+        'Day 14. Found crystals in a pocket of clay. Tapped one with a pencil. The whole wall rang for a minute.',
+        'Day 19. The crew sleep with earplugs now. I sleep with headphones on.',
+        'Day 23. Every sound down here bends toward one note. I walked the tunnels with a tuner. It is strongest far out, past the hard rock.',
+        'Day 30. It comes from one point. One grain of gold, no bigger than a pixel on my screen.',
+        'Day 31. I recorded it. On playback the tape is blank, and I can still hear it.',
+        'Last entry. The floor under the gold was hollow, and the hollow was full of the same note, louder. I am taking the recorder down.',
       ],
     },
     {
-      title: 'The Dog Who Dug',
+      title: 'The Choir',
       fragments: [
-        'The shepherd had one dog and the dog had one habit. Wherever they stopped, she dug.',
-        'The village laughed at the holes. Then the holes got deep enough that nobody laughed near them.',
-        'One morning the dog was gone and there was a tunnel where she had slept, straight down, as clean as a well.',
-        'The shepherd sold the flock to buy rope.',
-        'Down there the shepherd found pawprints pressed into stone that had been stone for a very long time.',
-        'Every few days, a bark. Always farther. Always lower.',
-        'The rope ran out. The shepherd kept going.',
-        'Old shepherds say a good dog finds what you lost. Nobody says what a good dog does when it finds something that was never yours.',
-        'Near the end the light came from below, gold, and the barking stopped.',
-        'They found the shepherd’s crook at the bottom of the tunnel, and beside it, a second set of footprints that walked on, deeper.',
+        'The village had a choir of eleven, and a cave they were told never to sing in.',
+        'The youngest sang one note in it anyway, on a dare. The cave held the note for a whole day.',
+        'After that the choir practised there every Sunday. The cave learned the harmonies before they did.',
+        'People came from the next valley to listen. Then from the next country.',
+        'The crystals in the walls grew a finger a year, always toward the singers.',
+        'One winter the choir sang a chord nobody had written. No one would say who started it.',
+        'The rock began to sing on weekdays, when the church was empty.',
+        'The eleventh voice stopped coming to practice. The other ten swore they could still hear her, under the floor.',
+        'They followed her down with lanterns, singing so they would not get lost.',
+        'The cave is quiet now. Hum in it and ten voices join in, then one more, a long way down.',
       ],
     },
     {
-      title: 'The Harbor Below',
+      title: 'The Bellfounder',
       fragments: [
-        'The port was rich because its lighthouse could see ships that had not yet come over the horizon.',
-        'The keeper said the light did not come from the lamp. It came up through the floor, from somewhere under the town.',
-        'Merchants paid well to know which ships were coming. Nobody asked how the keeper knew.',
-        'Wine jars began washing up in the harbor sealed and full, stamped with the name of the port, dated a hundred years ahead.',
-        'The keeper dug under the lighthouse to find the source. The town helped. The town was greedy.',
-        'They found it: one point of gold so bright it had no size.',
-        'That night the sea came in slowly, politely, like a guest.',
-        'The anchor of the last ship out was found later, miles inland, deep in the rock, pointing down.',
-        'Divers say the lighthouse is still lit, on the sea floor, under the silt.',
-        'It is pointing the way. It always was.',
+        'The bellfounder bought the quarry for its ore. Every bell she cast from it came out of the mould already ringing.',
+        'They all rang the same note, whatever their size. Hand bells, church bells, a bell as big as a cart.',
+        'She tried ore from other mines. Those bells rang true. She went back to the quarry.',
+        'Towns that hung her bells said they rang on their own before storms, and before good news.',
+        'She dug deeper for purer ore. The deeper she dug, the less her bells needed striking.',
+        'Her apprentice left a note: The ore isn’t making the sound. It’s remembering it.',
+        'She cast one last bell from nothing but gold dust from the deepest seam.',
+        'It made no sound when struck. Everyone in the valley heard it anyway.',
+        'She hung it at the bottom of the shaft and went down to hear it properly.',
+        'Her bells still hang in a hundred towers. Once a year, at the same moment, they all ring.',
       ],
     },
     {
-      title: 'The Garrison',
+      title: 'The Listeners',
       fragments: [
-        'Orders: hold the pit. Let no one down. Let nothing up.',
-        'We were not told what was in the pit. Soldiers are not told things. That is what makes us soldiers.',
-        'The first winter, men began to hear their names called from below, in their mothers’ voices.',
-        'The captain ordered the pit filled. Every morning it was open again.',
-        'We drew lots for who would stand closest to the edge. I stopped drawing lots. I volunteered.',
-        'There is a light at the bottom. It is very small. It is very patient.',
-        'The relief column never came. We stopped expecting it. We stopped remembering which country sent us.',
-        'I buried my sword at the edge so whoever comes next will know someone stood here.',
-        'The last order I gave was to let them go down, if they wanted. All of them did.',
-        'I am holding the pit. I am the pit. Let no one down.',
+        'An order took a vow: no speech, no song, no step louder than a breath. Only listening.',
+        'They built their house over the quarry because it was the quietest place they had found. It was not quiet.',
+        'Under the silence was a hum, and under the hum a melody so slow that one note lasted a season.',
+        'They wrote it down, one note a year, in a book with no words.',
+        'After two hundred years the book held two hundred notes. The abbot said it was only the opening.',
+        'A novice played every note on a reed flute in one afternoon. They threw her out, then followed her to hear it again.',
+        'It was a lullaby. Something very old was humming itself to sleep, or awake.',
+        'They dug a little every night, by hand, to hear the next bar sooner.',
+        'The last of them wrote: It is not one voice. It is every stone, each a note, and the gold is the key they are in.',
+        'The book ends on a blank page with a crystal pressed in it, and the page is warm.',
       ],
     },
     {
-      title: 'The Bone Readers',
+      title: 'The Tuners',
       fragments: [
-        'Our order reads the future in bones. The spine says how long. The ribs say how many.',
-        'Every bone we read pointed the same way. Down.',
-        'We built our temple over the place the bones pointed to and called it holy, because we were afraid to call it anything else.',
-        'The eldest reader dreamed of a gold eye opening in the dark. She did not wake.',
-        'We laid her bones out to read them. They spelled our own names.',
-        'Novices are told the eye is a god. Readers are told it is a door. The eldest knew better and said nothing.',
-        'The bones say it was here before there were bones.',
-        'We carved the eye into the doorway so it would know we were friendly. We did not know if it could tell.',
-        'The temple sank a finger’s width a year. We measured it. We prayed about it. We kept measuring.',
-        'Last reading: one gold eye, and under it, a world, and under that, another eye.',
+        'Long before bells there were tuners: people who grew crystals the way others grew wheat.',
+        'They planted seed stones in the dark and sang to them. A crystal grown to a song keeps the song.',
+        'Their cities were built of tuned stone. You could walk down a street and play it.',
+        'They grew a stone organ as long as a valley and played it once a generation.',
+        'Every pipe they grew leaned the same way, toward a point deep in the rock none of them had seen.',
+        'Some said it was a seed stone too. The first one, planted by no one.',
+        'Tuners did not break rock. They asked it, by singing, and it opened.',
+        'In time the songs they sang were not their own. They were answering.',
+        'The last tuner sang the city’s doors closed, and the stone grew over it, still in tune.',
+        'Break their crystals and you destroy nothing. You only let the note out.',
       ],
     },
     {
-      title: 'The Clockmakers',
+      title: 'The First Song',
       fragments: [
-        'The guild was asked a simple question by a rich patron: how many pieces is the world made of?',
-        'We built a machine to count them. Ten million, it said. We built a better machine. Ten million, exactly.',
-        'Too exact. Worlds are not exact. Something had made this one.',
-        'One of the ten million would not be counted. The machine skipped it every time, the way an eye skips its own blind spot.',
-        'The gears in that part of the machine wore smooth and golden, as if something warm had been turning them from inside.',
-        'We followed the skipped piece down through the floor of the workshop.',
-        'Our best apprentice built a ball that went only in straight lines. She said curiosity should not wander.',
-        'Down there, every clock we brought stopped at the same time and started again a little later than it should.',
-        'The patron arrived to collect his answer. He was older than the guild. He thanked us and went down alone.',
-        'Count again, he wrote in the ledger, after you find it. You will find one fewer. Then one more.',
+        'The first people to come here had no words. They had hands, and they clapped.',
+        'The cave clapped back. That was the first conversation.',
+        'They learned which walls answered high and which answered low, and marked the best echoes with red ochre.',
+        'A child struck two stones in a rhythm, and the cave kept it going after she stopped.',
+        'They came back only to make sound. Food could be found anywhere. This could not.',
+        'Someone blew across a hollow bone and the cave made it a chord. Nobody slept that night.',
+        'The deeper they went, the more the cave seemed to know their songs before they sang them.',
+        'They left their bone flutes in the deepest chamber, as a gift, or as a way to be remembered.',
+        'The flutes have turned to stone. The stone still plays them when the air moves right.',
+        'Every song you have ever heard began with someone clapping in the dark, waiting for an answer.',
       ],
     },
     {
-      title: 'Before People',
+      title: 'Before Ears',
       fragments: [
-        'Before there were diggers there was a sea, and before the sea there was dark, and in the dark, one point of gold.',
-        'Shelled things circled it for a hundred million years, spiralling their shells toward it without knowing why.',
-        'Rock settled around it like snow around a lamp post.',
-        'Green things grew on the rock where its light leaked through the cracks.',
-        'It was not waiting. Waiting is a thing people do. It was simply there, and things came.',
-        'Every creature that came close enough grew a little more curious, and its children more curious still.',
-        'The first animal to dig was not hungry. It only wanted to see.',
-        'The rock remembers every animal that tunnelled toward the light. Some of them are still in it, curled up, facing the same way.',
-        'By the time the first people arrived, the world had already been dug, filled, and dug again, many times.',
-        'The gold does not make worlds. It makes diggers. The worlds are just what diggers leave behind.',
+        'Before there were ears there was rock, and the rock was already singing.',
+        'Heat moved through it and it rang. Weight pressed down on it and it rang lower.',
+        'At the centre of the sound sat one point of gold, and everything around it tuned itself to it.',
+        'Crystals grew in the cracks the way frost grows on glass, each one cut to a note.',
+        'Seas came and went above it. The song went on underneath, slower than tides.',
+        'It was not waiting to be heard. Wanting to be heard is a thing people do. It was only singing.',
+        'The first creatures that could feel a tremor crept toward it. Their young could hear a little more.',
+        'Ears are what happens when a world listens long enough.',
+        'By the time anyone could hear it properly, it had been playing longer than there had been anyone.',
+        'The gold does not make worlds. It makes listeners. The worlds are what listeners dig on the way down.',
       ],
     },
     {
@@ -1455,14 +1435,14 @@ body.listening .hud > * { pointer-events: none; }
       fragments: [
         'You are not the first. You know that now.',
         'Every journal down here was written by someone who thought this layer was the bottom.',
-        'Every ball you send out comes back a little more like you: patient, stubborn, curious.',
-        'The relics are not lost. They were left. People leave things where they expect someone to come.',
-        'When you broke the first Golden Pixel, a world folded closed behind you. Someone is digging in it now.',
-        'The foreman, the shepherd, the keeper, the soldier, the reader, the clockmaker. They all heard it. So did you.',
-        'It does not say much. Only: deeper.',
-        'Some diggers stopped and cleared every pixel of their world first, so the next one would remember them. The next one always does.',
-        'There is no bottom. There is only the next world, and the dog who went first.',
-        'Leave something behind for whoever follows. Then go down.',
+        'Every ball you send out is a note. Together they play a song nobody has heard before, because you are the one playing it.',
+        'The relics are not lost. They were grown, and left where someone would find them.',
+        'When you broke the first Golden Pixel, a world folded shut behind you, still ringing. Someone is listening to it now.',
+        'The recordist, the choir, the bellfounder, the listeners, the tuners, the first clappers. They all heard it. So did you.',
+        'It does not say much. One note, held: deeper.',
+        'Some diggers cleared every pixel of their world before they left, so it would ring all the way through. The next one always hears it.',
+        'There is no bottom. There is only the next world, and the next verse.',
+        'Leave something singing for whoever follows. Then go down.',
       ],
     },
   ];
@@ -5854,7 +5834,7 @@ registerProcessor('pocket-six', PocketSix);
 // Stonesong: boot, game loop, autosave, and the music.
 (function () {
   const PQ = window.PQ, D = PQ.DATA;
-  const BUILD = '20261029-111800';                       // build.py stamps the build time here
+  const BUILD = '20261029-115933';                       // build.py stamps the build time here
   const $ = id => document.getElementById(id);
   const canvas = $('world');
   const yieldFrame = () => new Promise(r => setTimeout(r, 0));
