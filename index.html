@@ -715,30 +715,32 @@ body.listening .hud > * { pointer-events: none; }
     UPGRADES: { count: 240, near: 5, dia: f => 1 + Math.floor(f) },
 
     // Ball types. speed in world px/s, dmg per hit, cost = bits for one more.
-    // Every type but the Pebble is unlocked in the skill tree with diamonds.
+    // Every type but the Ping is unlocked in the skill tree with diamonds. Keys are the old
+    // names (saves, the tree and the music go by key); what each one does is its own.
     BALLS: [
       { key: 'pebble', name: 'Ping', color: '#e9e4d6', dmg: 1,  speed: 46,  cost: 15,
         desc: 'Bounces around and chips whatever it hits.' },
-      { key: 'lancer', name: 'Shard', color: '#38c8ff', dmg: 3,  speed: 120, cost: 300,
-        desc: 'Only travels in straight lines. Cuts long, clean tunnels.',
-        special: { key: 'pierce', name: 'Edge', desc: 'Keeps going through more broken pixels', max: 6, base: 0, step: 2 } },
+      { key: 'lancer', name: 'Pulse', color: '#38c8ff', dmg: 6,  speed: 170, cost: 300,
+        desc: 'Moves only on the beat: still between beats, then a hard dash on each one. It keeps the music\'s tempo.',
+        special: { key: 'stride', name: 'Stride', desc: '+35% dash on each beat', max: 6, base: 0, step: 1 } },
       { key: 'bomb',   name: 'Gong',   color: '#ff5a48', dmg: 2,  speed: 50,  cost: 2800,
-        desc: 'Bursts a circle of rock on impact, then rings back up.',
-        special: { key: 'radius', name: 'Swell', desc: '+2 px burst radius', max: 6, base: 4, step: 2 } },
+        desc: 'On impact it sends out a ring of sound that chips the first rock it meets in every direction, then rings back up.',
+        special: { key: 'swell', name: 'Swell', desc: 'The ring reaches further, strikes more rock and cuts deeper', max: 6, base: 0, step: 1 } },
       { key: 'venom',  name: 'Echo', plural: 'Echoes', color: '#6fe05a', dmg: 2,  speed: 52,  cost: 40000,
-        desc: 'Its hits keep ringing in the rock, eating outward from where it touched.',
-        special: { key: 'spread', name: 'Decay', desc: 'Echoes ring further', max: 6, base: 0, step: 1 } },
-      { key: 'spark',  name: 'Static', color: '#ffe14a', dmg: 3, speed: 64, cost: 150000,
-        desc: 'Every hit throws arcs of static into the rock nearby.',
-        special: { key: 'arcs', name: 'Crackle', desc: '+1 arc per hit', max: 6, base: 2, step: 1 } },
+        desc: 'A ghost follows a second behind it and strikes again wherever it struck, one pixel deeper.',
+        special: { key: 'decay', name: 'Decay', desc: 'One more echo after the last', max: 6, base: 2, step: 1 } },
+      { key: 'spark',  name: 'String', color: '#ffe14a', dmg: 3, speed: 64, cost: 150000,
+        desc: 'They pair up, joined by a vibrating string. Rock the string passes through takes damage.',
+        special: { key: 'tension', name: 'Tension', desc: '+15 px of string', max: 6, base: 70, step: 15 } },
       { key: 'midas',  name: 'Harmonic', color: '#ff9b2e', dmg: 4,  speed: 60,  cost: 400000,
-        desc: 'Every pixel it breaks pays out several times over.',
-        special: { key: 'mult', name: 'Overtones', desc: '+2× payout', max: 6, base: 4, step: 2 } },
-      { key: 'drill',  name: 'Drone',  color: '#b46cff', dmg: 30, speed: 40,  cost: 1.2e7,
-        desc: 'Bores straight through anything it can break in one hit.' },
-      { key: 'seeker', name: 'Dowser', color: '#f4f4f4', dmg: 60, speed: 70,  cost: 2.5e8,
-        desc: 'Homes in on the Golden Pixel, boring through soft rock on the way.',
-        special: { key: 'steer', name: 'Pull', desc: 'Steers harder toward the gold', max: 6, base: 1, step: 1 } },
+        desc: 'Pixels whose note is in the chord playing now pay it many times over. Watch them shimmer around it.',
+        special: { key: 'mult', name: 'Overtones', desc: '+4× payout on chord notes', max: 6, base: 9, step: 4 } },
+      { key: 'drill',  name: 'Drone',  color: '#b46cff', dmg: 30, speed: 26,  cost: 1.2e7,
+        desc: 'Drifts slowly through the rock, humming. Everything around it wears away, hollowing out caverns.',
+        special: { key: 'hum', name: 'Hum', desc: '+1 px hum radius', max: 6, base: 3, step: 1 } },
+      { key: 'seeker', name: 'Siren', color: '#f4f4f4', dmg: 60, speed: 70,  cost: 2.5e8,
+        desc: 'Heads for the Golden Pixel, boring through soft rock, and calls every ball nearby to follow it.',
+        special: { key: 'call', name: 'Call', desc: 'Calls balls from 20 px further', max: 6, base: 60, step: 20 } },
     ],
     UNLOCK_MULT: 2,
     // Owning this many of a type multiplies what that type earns by MILESTONE_MULT, each time.
@@ -818,17 +820,24 @@ body.listening .hud > * { pointer-events: none; }
     RUSH_SPEED: 3, SHINE_VALUE: 3, GLASS_DMG: 5,
     STORM_EVERY: 0.07,      // s between bolts
 
-    // Lancers only travel along the axes. They turn 90° on LANCER_TURN of their bounces (rock,
-    // relics and the map's edge alike) and, out in the open, LANCER_WANDER times a second on
-    // average, so none is ever stuck in a cleared lane between two things it can't break.
-    LANCER_TURN: 0.2,
-    LANCER_WANDER: 0.06,
+    // The beat the Pulse dashes on: the music's own when it plays, else this many seconds.
+    BEAT: 0.6,
+    PULSE_DASH: 0.22,       // s a Pulse dashes on each beat (Stride adds 35% a level)
+    PULSE_PIERCE: 5,        // pixels a dash breaks through before it bounces
+    GONG_SPEED: 120,        // px/s the ring spreads
+    GONG_REACH: 24,         // px the ring reaches (Swell adds 8 a level)
+    GONG_RAYS: 32,          // rock the ring can strike (each Swell level adds as many again)
+    ECHO_DELAY: 1.0,        // s between a strike and its echo
+    ECHO_FADE: 0.75,        // each echo after the first strikes this much softer again
+    ECHO_CAP: 8000,         // echoes waiting at once
+    STRING_TICK: 0.35,      // s between a string's strikes on the rock it passes through
+    STRING_PIERCE: 2,       // pixels a String bores through, so its string ends up in the rock
+    HUM_TICK: 0.3,          // s between a Drone's hums
+    SIREN_TURN: 1.4,        // rad/s a called ball turns toward its Siren
+    SIREN_LISTEN: 32,       // Sirens the rest of the swarm listens for
 
-    POISON_TICK: 0.25,      // s between poison damage passes
-    POISON_CAP: 60000,      // live poisoned cells
-    BOMB_COOLDOWN: 1.0,
-    SPARK_COOLDOWN: 0.35,   // s between a Lightning ball's arc bursts
-    SPARK_REACH: 14,        // px an arc can jump
+    BOMB_COOLDOWN: 1.0,     // s before a Gong rings again
+    SPARK_REACH: 14,        // px a Thunder Roll arc can jump
     OFFLINE_RATE: 0.3,      // share of live income paid while away
     OFFLINE_CAP: 8 * 3600,  // s
     STAR_BONUS: 0.5,        // +50% value per Golden Pixel found
@@ -1462,7 +1471,8 @@ body.listening .hud > * { pointer-events: none; }
   const root = typeof window !== 'undefined' ? window : globalThis;
   const PQ = root.PQ;
   const D = PQ.DATA, T = D.T, MAT = D.MAT, BALLS = D.BALLS;
-  const W = D.W, H = D.H, MASK = D.TYPE_MASK, POI = D.POISON;
+  const W = D.W, H = D.H, MASK = D.TYPE_MASK;
+  const TRAIL = 16;                         // samples of each ball's last second, for Echo ghosts
   const TS = Math.log2(D.TILE);
   const B = {};
   BALLS.forEach((b, i) => { B[b.key] = i; });
@@ -1529,10 +1539,17 @@ body.listening .hud > * { pointer-events: none; }
     this.tilesY = Math.ceil(H / D.TILE);
     this.tileDirty = new Uint8Array(this.tilesX * this.tilesY).fill(1);
     this.ovDirty = new Uint8Array(this.tilesX * this.tilesY).fill(1);
-    this.poison = new Int32Array(D.POISON_CAP);
-    this.poisonGen = new Uint8Array(D.POISON_CAP);
-    this.pn = 0;
-    this.poisonT = 0;
+    // The beat, kept in time with the music (syncBeat) when it plays: Pulses dash on it.
+    this.beatLen = D.BEAT; this.beatT = D.BEAT;
+    this.chord = 0;                                       // the chord playing now (a scale degree); see inChord
+    this.heard = 0;                                       // s since the music last set the beat and chord
+    this.rings = [];                                      // Gong rings spreading out
+    this.echoQ = []; this.echoH = 0;                      // Echo strikes waiting: [time, x, y, dx, dy, amount, mult, left]
+    this.pn = 0;                                          // echoes waiting (the music hears this)
+    this.trail = new Float32Array(M * TRAIL * 2);         // each ball's last second, for the Echo ghosts
+    this.trailI = 0; this.trailT = 0;
+    this.partner = new Int32Array(M).fill(-1);            // String pairs
+    this.stringT = 0; this.humT = 0;
     this.fxI = new Int32Array(256); this.fxT = new Uint8Array(256); this.fxn = 0;
     this.events = [];
     this.hist = [state.earned];
@@ -1567,13 +1584,18 @@ body.listening .hud > * { pointer-events: none; }
     this.tDmg = BALLS.map(b => Math.round(b.dmg * Math.pow(TR.dmg.mult, s.up[b.key].dmg)) * (fx('glass') ? D.GLASS_DMG : 1));
     this.tMult = BALLS.map(b => Math.pow(D.MILESTONE_MULT, milestone(s.owned[b.key]).lv));
     this.tSpd = BALLS.map(b => b.speed * (1 + TR.spd.step * s.up[b.key].spd) * (fx('rush') ? D.RUSH_SPEED : 1));
-    this.pierceMax = BALLS.map(b => b.key === 'lancer' ? sp('lancer') : (b.key === 'drill' || b.key === 'seeker') ? 255 : 0);
-    this.bombR = sp('bomb');
-    this.venomGen = 4 + 2 * sp('venom');
-    this.venomP = 0.42 + 0.03 * sp('venom');
-    this.arcs = sp('spark');
-    this.midas = sp('midas');
-    this.steer = sp('seeker');
+    this.pierceMax = BALLS.map(b => b.key === 'lancer' ? D.PULSE_PIERCE : b.key === 'spark' ? D.STRING_PIERCE : (b.key === 'drill' || b.key === 'seeker') ? 255 : 0);
+    this.dash = D.PULSE_DASH * (1 + 0.35 * sp('lancer'));
+    this.ringReach = D.GONG_REACH + 8 * sp('bomb');
+    this.ringRays = D.GONG_RAYS * (1 + sp('bomb'));
+    this.ringDepth = 1 + (sp('bomb') >> 1);               // pixels deep each part of the ring strikes
+    this.echoes = sp('venom');
+    this.stringLen = sp('spark');
+    this.harm = sp('midas');
+    this.humR = sp('drill');
+    this.callR = sp('seeker');
+    this.steer = 1;                                       // how tightly a Siren aims at the gold
+    this.arcs = 0;                                        // Thunder Roll arcs per bolt (set while it strikes)
     this.tapDmg = Math.round(3 * Math.pow(1.6, s.global.tap)) * (fx('glass') ? D.GLASS_DMG : 1);
     this.tapR = Math.min(10, 2 + Math.floor(s.global.tap / 3));
     this.discount = 1 - perkVal(s, 'cheap');
@@ -1649,11 +1671,7 @@ body.listening .hud > * { pointer-events: none; }
     const k = this.n++;
     this.bx[k] = x; this.by[k] = y;
     const aim = this.s.aim;
-    if (t === B.lancer) {
-      // Mostly along the axis nearest the aim; now and then any axis, so tunnels branch.
-      const d = this.rng() < 0.7 ? (Math.round(aim / (Math.PI / 2)) & 3) : Math.floor(this.rng() * 4);
-      this.vx[k] = [1, 0, -1, 0][d]; this.vy[k] = [0, 1, 0, -1][d];
-    } else if (t === B.seeker && !this.s.found) {
+    if (t === B.seeker && !this.s.found) {
       const g = this.w.gold, a = Math.atan2(g.y + 0.5 - y, g.x + 0.5 - x) + (this.rng() - 0.5) * 1.8 / this.steer;
       this.vx[k] = Math.cos(a); this.vy[k] = Math.sin(a);
     } else {
@@ -1664,6 +1682,7 @@ body.listening .hud > * { pointer-events: none; }
     this.cd[k] = 0;
     this.pl[k] = this.pierceMax[t];
     this.lastCell[k] = -1;
+    for (let q = 0; q < TRAIL; q++) { this.trail[(k * TRAIL + q) * 2] = x; this.trail[(k * TRAIL + q) * 2 + 1] = y; }
     return true;
   };
 
@@ -1717,57 +1736,6 @@ body.listening .hud > * { pointer-events: none; }
     }
   };
 
-  P.explode = function (cx, cy, R, amount, mult) {
-    const cells = this.w.cells;
-    for (let dy = -R; dy <= R; dy++) {
-      const y = cy + dy;
-      if (y < 0 || y >= H) continue;
-      const span = Math.floor(Math.sqrt(R * R - dy * dy));
-      for (let dx = -span; dx <= span; dx++) {
-        const x = cx + dx;
-        if (x < 0 || x >= W || !(cells[y * W + x] & MASK)) continue;
-        this.hit(x, y, amount, mult);
-      }
-    }
-  };
-
-  P.poisonCell = function (x, y, gen) {
-    const cells = this.w.cells, i = y * W + x, c = cells[i];
-    if ((c & POI) || this.pn >= D.POISON_CAP) return;
-    const t = c & MASK;
-    if (!t || MAT[t].hard) return;
-    cells[i] = c | POI;
-    this.poison[this.pn] = i;
-    this.poisonGen[this.pn] = gen;
-    this.pn++;
-    this.dirty(x, y);
-  };
-
-  P.tickPoison = function () {
-    const cells = this.w.cells, P_ = this.poison, G = this.poisonGen;
-    const amt = Math.max(1, this.tDmg[B.venom]), mult = this.tMult[B.venom];
-    this.src = B.venom;
-    const n0 = this.pn;
-    let j = 0;
-    for (let q = 0; q < n0; q++) {
-      const i = P_[q], g = G[q];
-      if (!(cells[i] & POI)) continue;      // broken by something else
-      const x = i % W, y = (i / W) | 0;
-      if (this.hit(x, y, amt, mult) === 1) {
-        if (g < this.venomGen) {
-          if (x > 0 && this.rng() < this.venomP) this.poisonCell(x - 1, y, g + 1);
-          if (x < W - 1 && this.rng() < this.venomP) this.poisonCell(x + 1, y, g + 1);
-          if (y > 0 && this.rng() < this.venomP) this.poisonCell(x, y - 1, g + 1);
-          if (y < H - 1 && this.rng() < this.venomP) this.poisonCell(x, y + 1, g + 1);
-        }
-      } else {
-        P_[j] = i; G[j] = g; j++;
-      }
-    }
-    for (let q = n0; q < this.pn; q++) { P_[j] = P_[q]; G[j] = G[q]; j++; }
-    this.pn = j;
-  };
-
   // Every ball impact is also offered to the music (sim.snd, see audio.js): who hit what, and did it break.
   P.ballHit = function (k, t, cx, cy) {
     const snd = this.snd;
@@ -1782,16 +1750,155 @@ body.listening .hud > * { pointer-events: none; }
     this.src = t;
     if (t === B.bomb && this.cd[k] <= 0) {
       this.cd[k] = D.BOMB_COOLDOWN;
-      this.explode(cx, cy, this.bombR, this.tDmg[t] * 2, this.tMult[t]);
-      return (this.w.cells[cy * W + cx] & MASK) === T.RELIC ? -1 : 0;
+      this.ring(this.bx[k], this.by[k], this.tDmg[t] * 3, this.tMult[t]);
     }
-    const r = this.hit(cx, cy, this.tDmg[t], (t === B.midas ? this.midas : 1) * this.tMult[t]);
-    if (t === B.venom && r === 0) this.poisonCell(cx, cy, 0);
-    if (t === B.spark && this.cd[k] <= 0) { this.cd[k] = D.SPARK_COOLDOWN; this.spark(cx, cy, this.tDmg[t], this.tMult[t]); }
+    const r = this.hit(cx, cy, this.tDmg[t], (t === B.midas && this.inChord(cx, cy) ? this.harm : 1) * this.tMult[t]);
+    if (t === B.venom && r >= 0 && r !== 2) this.echo(cx, cy, this.vx[k], this.vy[k], this.tDmg[t], this.tMult[t], this.echoes);
     return r;
   };
 
-  // Lightning: arcs jump from a hit to rock nearby and strike it.
+  // ---- Harmonic: a pixel's note, as the music plays it (audio.js hashes the same way) ----
+  function noteHash(x, y) {
+    let h = Math.imul(x, 374761393) ^ Math.imul(y, 668265263);
+    h = Math.imul(h ^ (h >>> 13), 1274126177);
+    return (h ^ (h >>> 16)) >>> 0;
+  }
+  // In the chord: the pixel's scale degree is the chord's root, third or fifth.
+  P.inChord = function (x, y) {
+    const r = ((noteHash(x, y) % 7 - this.chord) % 7 + 7) % 7;
+    return r === 0 || r === 2 || r === 4;
+  };
+  // The music keeps the beat and the chord. Without it the sim keeps its own, so a quiet
+  // game plays the same: a beat every D.BEAT and a chord change every 4 s.
+  P.syncBeat = function (until, len, chord) {
+    this.heard = 0;
+    this.chord = chord;
+    if (!(len > 0.1 && len < 3)) return;
+    this.beatLen = len;
+    let d = until - this.beatT;
+    d -= Math.round(d / len) * len;                       // the nearest beat, not one a bar away
+    this.beatT += d * 0.5;
+  };
+  P.onBeat = function () {
+    const bt = this.bt, n = this.n, dash = this.dash;
+    for (let k = 0; k < n; k++) if (bt[k] === B.lancer) this.cd[k] = dash;
+  };
+
+  // ---- Gong: a ring of sound from where it struck, out through open space ----
+  P.ring = function (x, y, dmg, mult) {
+    if (this.rings.length >= 300) return;
+    const n = this.ringRays, rot = this.rng() * Math.PI * 2, dir = new Float32Array(n * 2);
+    for (let q = 0; q < n; q++) { const a = rot + q * Math.PI * 2 / n; dir[q * 2] = Math.cos(a); dir[q * 2 + 1] = Math.sin(a); }
+    this.rings.push({ x, y, r: 0.5, R: this.ringReach, dmg, mult, n, dir, alive: new Uint8Array(n).fill(this.ringDepth), heard: false });
+  };
+  P.tickRings = function (dt) {
+    const cells = this.w.cells, keep = [];
+    this.src = B.bomb;
+    for (const g of this.rings) {
+      const r1 = Math.min(g.R, g.r + D.GONG_SPEED * dt);
+      for (let q = 0; q < g.n; q++) {
+        if (!g.alive[q]) continue;
+        const dx = g.dir[q * 2], dy = g.dir[q * 2 + 1];
+        for (let rr = g.r; rr < r1; rr += 1) {
+          const x = (g.x + dx * rr) | 0, y = (g.y + dy * rr) | 0;
+          if (x < 0 || y < 0 || x >= W || y >= H) { g.alive[q] = 0; break; }
+          const mat = cells[y * W + x] & MASK;
+          if (!mat) continue;
+          const res = this.hit(x, y, g.dmg, g.mult);
+          if (!g.heard && this.snd) { g.heard = true; this.snd.add(B.bomb, mat, res === 1, x, y); }
+          if (--g.alive[q] === 0 || res !== 1) { g.alive[q] = 0; break; }   // a deeper ring goes on into what it broke
+        }
+      }
+      g.r = r1;
+      if (r1 < g.R) keep.push(g);
+    }
+    this.rings = keep;
+  };
+
+  // ---- Echo: the strike again, a moment later, one pixel deeper ----
+  P.echo = function (x, y, vx, vy, amount, mult, left) {
+    if (left <= 0 || this.echoQ.length - this.echoH >= D.ECHO_CAP) return;
+    const dx = Math.abs(vx) > 0.38 ? Math.sign(vx) : 0, dy = Math.abs(vy) > 0.38 ? Math.sign(vy) : 0;
+    this.echoQ.push([this.s.playTime + D.ECHO_DELAY, x, y, dx, dy, amount, mult, left]);
+  };
+  P.tickEchoes = function () {
+    const Q = this.echoQ, cells = this.w.cells, now = this.s.playTime;
+    this.src = B.venom;
+    while (this.echoH < Q.length && Q[this.echoH][0] <= now) {
+      const e = Q[this.echoH++];
+      let x = e[1], y = e[2];
+      if (!(cells[y * W + x] & MASK)) { x += e[3]; y += e[4]; }   // broken already: the next one in
+      if (x < 0 || y < 0 || x >= W || y >= H || !(cells[y * W + x] & MASK)) continue;
+      const amt = e[5] < 1 ? (this.rng() < e[5] ? 1 : 0) : Math.round(e[5]);
+      if (amt) this.hit(x, y, amt, e[6]);
+      if (e[7] > 1) Q.push([now + D.ECHO_DELAY, x, y, e[3], e[4], e[5] * D.ECHO_FADE, e[6], e[7] - 1]);
+    }
+    if (this.echoH > 4096) { Q.splice(0, this.echoH); this.echoH = 0; }
+    this.pn = Q.length - this.echoH;
+  };
+
+  // ---- String: pairs, and the rock between them ----
+  // Pairs are Strings in the order they were bought; the last one waits for a partner.
+  P.pairStrings = function () {
+    const bt = this.bt, n = this.n, pt = this.partner;
+    let open = -1;
+    for (let k = 0; k < n; k++) {
+      pt[k] = -1;
+      if (bt[k] !== B.spark) continue;
+      if (open < 0) open = k;
+      else { pt[k] = open; pt[open] = k; open = -1; }
+    }
+  };
+  P.tickStrings = function () {
+    const n = this.n, bt = this.bt, pt = this.partner, cells = this.w.cells, L = this.stringLen;
+    const dmg = this.tDmg[B.spark], mult = this.tMult[B.spark];
+    this.src = B.spark;
+    for (let k = 0; k < n; k++) {
+      const j = pt[k];
+      if (bt[k] !== B.spark || j < k) continue;
+      const x0 = this.bx[k], y0 = this.by[k], dx = this.bx[j] - x0, dy = this.by[j] - y0, d = Math.hypot(dx, dy);
+      if (d > L || d < 2) continue;
+      // It cuts a line two pixels wide: the pixels on it and the ones beside it.
+      let heard = false;
+      const sx = Math.abs(dx) > Math.abs(dy) ? 0 : 1, sy = 1 - sx;
+      for (let q = 1, m = Math.ceil(d); q < m; q++) {
+        for (let o = 0; o < 2; o++) {
+          const x = ((x0 + dx * q / m) | 0) + sx * o, y = ((y0 + dy * q / m) | 0) + sy * o;
+          if (x >= W || y >= H) continue;
+          const mat = cells[y * W + x] & MASK;
+          if (!mat) continue;
+          const res = this.hit(x, y, dmg, mult);
+          if (!heard && res === 1 && this.snd) { heard = true; this.snd.add(B.spark, mat, true, x, y); }
+        }
+      }
+    }
+  };
+
+  // ---- Drone: everything within its hum wears away ----
+  P.tickHum = function () {
+    const n = this.n, bt = this.bt, cells = this.w.cells, R = this.humR, dmg = this.tDmg[B.drill], mult = this.tMult[B.drill];
+    this.src = B.drill;
+    for (let k = 0; k < n; k++) {
+      if (bt[k] !== B.drill) continue;
+      const cx = this.bx[k] | 0, cy = this.by[k] | 0;
+      let heard = false;
+      for (let dy = -R; dy <= R; dy++) {
+        const y = cy + dy;
+        if (y < 0 || y >= H) continue;
+        const span = Math.floor(Math.sqrt(R * R - dy * dy));
+        for (let dx = -span; dx <= span; dx++) {
+          const x = cx + dx;
+          if (x < 0 || x >= W) continue;
+          const mat = cells[y * W + x] & MASK;
+          if (!mat) continue;
+          const res = this.hit(x, y, dmg, mult);
+          if (!heard && this.snd) { heard = true; this.snd.add(B.drill, mat, res === 1, x, y); }
+        }
+      }
+    }
+  };
+
+  // Thunder Roll: arcs jump from a bolt to rock nearby and strike it.
   P.spark = function (cx, cy, amount, mult) {
     const cells = this.w.cells, R = D.SPARK_REACH;
     for (let a = 0; a < this.arcs; a++) {
@@ -1814,11 +1921,36 @@ body.listening .hud > * { pointer-events: none; }
     const seekGold = !this.s.found;
     const wh = this.effectOn('whirl') ? this.s.effects.whirl : null, turnMax = 2.6 * dt;
     const gx = this.w.gold.x + 0.5, gy = this.w.gold.y + 0.5;
+    // Sirens call the balls around them (the first SIREN_LISTEN of them, in a big swarm).
+    const sirens = [];
+    for (let k = 0; k < n && sirens.length < D.SIREN_LISTEN; k++) if (bt[k] === B.seeker) sirens.push(k);
+    const call2 = this.callR * this.callR, callTurn = D.SIREN_TURN * dt;
+    const pt = this.partner, L = this.stringLen;
     for (let k = 0; k < n; k++) {
       const t = bt[k];
       let x = bx[k], y = by[k], vx = VX[k], vy = VY[k];
+      const dashing = cd[k] > 0;
       if (cd[k] > 0) cd[k] -= dt;
-      if (wh && t !== B.lancer && !(t === B.seeker && seekGold)) {
+      // Steering: toward a Siren, or a String's partner once the string pulls taut.
+      let tx = 0, ty = 0, turn = 0;
+      if (t !== B.seeker && sirens.length) {
+        let best = call2;
+        for (const j of sirens) {
+          const dx = bx[j] - x, dy = by[j] - y, d2 = dx * dx + dy * dy;
+          if (d2 < best && d2 > 16) { best = d2; tx = dx; ty = dy; turn = callTurn; }
+        }
+      }
+      if (t === B.spark && pt[k] >= 0) {
+        const dx = bx[pt[k]] - x, dy = by[pt[k]] - y;
+        if (dx * dx + dy * dy > 0.36 * L * L) { tx = dx; ty = dy; turn = 2.2 * dt; }
+      }
+      if (turn) {
+        let a = Math.atan2(vx * ty - vy * tx, vx * tx + vy * ty);
+        a = a > turn ? turn : a < -turn ? -turn : a;
+        const c = Math.cos(a), sn = Math.sin(a), nvx = vx * c - vy * sn;
+        vy = vx * sn + vy * c; vx = nvx;
+      }
+      if (wh && !(t === B.seeker && seekGold)) {
         // Whirlpool: steer toward the eye and around it, so the swarm spirals in.
         const dx = wh.x - x, dy = wh.y - y, d = Math.hypot(dx, dy) || 1;
         const wx = (dx - dy * 0.9) / d, wy = (dy + dx * 0.9) / d;
@@ -1827,18 +1959,14 @@ body.listening .hud > * { pointer-events: none; }
         const c = Math.cos(a), sn = Math.sin(a), nvx = vx * c - vy * sn;
         vy = vx * sn + vy * c; vx = nvx;
       }
-      const lancer = t === B.lancer;
-      // A Lancer turns now and then even with nothing to hit, so it never just paces a lane.
-      if (lancer && rng() < D.LANCER_WANDER * dt) { const sg = rng() < 0.5 ? 1 : -1, tmp = vx; vx = -vy * sg; vy = tmp * sg; }
-      let dist = this.tSpd[t] * dt, hits = 0;
+      // A Pulse only moves while it dashes, on the beat.
+      let dist = t === B.lancer && !dashing ? 0 : this.tSpd[t] * dt, hits = 0;
       while (dist > 0 && hits < 3) {
         const st = dist < 0.9 ? dist : 0.9;
         dist -= st;
-        let nx = x + vx * st, ny = y + vy * st, edge = false;
-        if (nx < 0) { nx = -nx; vx = -vx; edge = true; } else if (nx >= W) { nx = 2 * W - nx - 0.01; vx = -vx; edge = true; }
-        if (ny < 0) { ny = -ny; vy = -vy; edge = true; } else if (ny >= H) { ny = 2 * H - ny - 0.01; vy = -vy; edge = true; }
-        // The map's edge counts as a bounce for a Lancer's turn, like rock does.
-        if (edge && lancer && rng() < D.LANCER_TURN) { const sg = rng() < 0.5 ? 1 : -1, tmp = vx; vx = -vy * sg; vy = tmp * sg; }
+        let nx = x + vx * st, ny = y + vy * st;
+        if (nx < 0) { nx = -nx; vx = -vx; } else if (nx >= W) { nx = 2 * W - nx - 0.01; vx = -vx; }
+        if (ny < 0) { ny = -ny; vy = -vy; } else if (ny >= H) { ny = 2 * H - ny - 0.01; vy = -vy; }
         const cx = nx | 0, cy = ny | 0;
         if (!(cells[cy * W + cx] & MASK)) { x = nx; y = ny; continue; }
         hits++;
@@ -1858,10 +1986,8 @@ body.listening .hud > * { pointer-events: none; }
           vx = -vx; vy = -vy;
         }
         pl[k] = this.pierceMax[t];
-        if (lancer) {
-          if (rng() < D.LANCER_TURN) { const sg = rng() < 0.5 ? 1 : -1, tmp = vx; vx = -vy * sg; vy = tmp * sg; }
-        } else if (t === B.seeker && seekGold) {
-          // Re-aim at the gold after every bounce. Instinct narrows the spread.
+        if (t === B.seeker && seekGold) {
+          // Re-aim at the gold after every bounce.
           const a = Math.atan2(gy - y, gx - x) + (rng() - 0.5) * 1.8 / this.steer;
           vx = Math.cos(a); vy = Math.sin(a);
         } else {
@@ -1879,10 +2005,25 @@ body.listening .hud > * { pointer-events: none; }
   P.step = function (dt) {
     const s = this.s;
     s.playTime += dt;
+    this.heard += dt;
+    if (this.heard > 1) this.chord = [0, 5, 3, 4][Math.floor(s.playTime / 4) & 3];   // no music: keep our own changes
+    this.beatT -= dt;
+    if (this.beatT <= 0) { this.beatT = Math.max(this.beatT + this.beatLen, 0.05); this.onBeat(); }
+    this.pairStrings();
     this.moveBalls(dt);
+    this.tickRings(dt);
+    this.tickEchoes();
+    this.stringT += dt;
+    if (this.stringT >= D.STRING_TICK) { this.stringT -= D.STRING_TICK; this.tickStrings(); }
+    this.humT += dt;
+    if (this.humT >= D.HUM_TICK) { this.humT -= D.HUM_TICK; this.tickHum(); }
+    this.trailT += dt;
+    if (this.trailT >= 1 / TRAIL) {
+      this.trailT -= 1 / TRAIL;
+      const q = this.trailI = (this.trailI + 1) % TRAIL, tr = this.trail;
+      for (let k = 0; k < this.n; k++) { tr[(k * TRAIL + q) * 2] = this.bx[k]; tr[(k * TRAIL + q) * 2 + 1] = this.by[k]; }
+    }
     this.tickEffects(dt);
-    this.poisonT += dt;
-    while (this.poisonT >= D.POISON_TICK) { this.poisonT -= D.POISON_TICK; this.tickPoison(); }
     this.rateT += dt;
     if (this.rateT >= 1) {
       this.rateT -= 1;
@@ -1892,6 +2033,12 @@ body.listening .hud > * { pointer-events: none; }
       for (let i = 0; i < this.acc.length; i++) { this.typeRate[i] += (this.acc[i] - this.typeRate[i]) * 0.2; this.acc[i] = 0; }
       this.trackLast();
     }
+  };
+
+  // Where ball k was about a second ago: its Echo ghost.
+  P.ghost = function (k) {
+    const q = (k * TRAIL + (this.trailI + 1) % TRAIL) * 2;
+    return { x: this.trail[q], y: this.trail[q + 1] };
   };
 
   // Lit well enough to act on: the same line a relic counts as found at.
@@ -2084,20 +2231,15 @@ body.listening .hud > * { pointer-events: none; }
     const d = this.s.drop, n = this.n, aim = this.s.aim;
     for (let k = 0; k < n; k++) {
       this.bx[k] = d.x; this.by[k] = d.y;
-      if (this.bt[k] === B.lancer) {
-        const q = (Math.round(aim / (Math.PI / 2)) + [0, 0, 1, 3][k & 3]) & 3;   // half along the aim, a quarter to each side
-        this.vx[k] = [1, 0, -1, 0][q]; this.vy[k] = [0, 1, 0, -1][q];
-      } else {
-        const a = aim + ((k + 0.5) / n - 0.5) * 2.4 + (this.rng() - 0.5) * 0.05;
-        this.vx[k] = Math.cos(a); this.vy[k] = Math.sin(a);
-      }
+      const a = aim + ((k + 0.5) / n - 0.5) * 2.4 + (this.rng() - 0.5) * 0.05;
+      this.vx[k] = Math.cos(a); this.vy[k] = Math.sin(a);
       this.pl[k] = this.pierceMax[this.bt[k]];
       this.cd[k] = 0;
       this.lastCell[k] = -1;
     }
   };
-  // One bolt of the Storm: a lit spot on the screen, and arcs into the rock around it. Paid
-  // like the pickaxe (it is the player's), heard as Lightning.
+  // One bolt of the Thunder Roll: a lit spot on the screen, and arcs into the rock around it.
+  // Paid like the pickaxe (it is the player's), heard as a String.
   P.bolt = function (r) {
     for (let tries = 0; tries < 8; tries++) {
       const x = (r.x0 + this.rng() * (r.x1 - r.x0)) | 0, y = (r.y0 + this.rng() * (r.y1 - r.y0)) | 0;
@@ -4019,7 +4161,11 @@ registerProcessor('pocket-six', PocketSix);
       if (!sim.snd || !m.ctx) return;
       const c = r.cam, hw = r.cssW / 2 / c.z, hh = r.cssH / 2 / c.z;
       sim.snd.setView(c.x - hw, c.y - hh, c.x + hw, c.y + hh, c.z);
-      sim.snd.frame(dt, m.ctx.currentTime, sim);
+      const e = sim.snd;
+      e.frame(dt, m.ctx.currentTime, sim);
+      // The next beat (every 4th step) as it reaches the ear, for the Pulse; and the chord.
+      const lat = m.ctx.outputLatency || m.ctx.baseLatency || 0;
+      sim.syncBeat(e.next + ((4 - e.step % 4) % 4) * e.stepDur - m.ctx.currentTime + lat, e.stepDur * 4, e.chord);
       if (m.listening) listenTick();
     };
     m.event = function (e) { if (game.sim.snd) game.sim.snd.event(e); };
@@ -4561,6 +4707,7 @@ registerProcessor('pocket-six', PocketSix);
     this.drawUpgrades(ctx, toDX, toDY, vx0, vy0, vx1, vy1);
     this.drawGold(ctx, toDX, toDY, vx0, vy0, vx1, vy1);
     this.drawParticles(ctx, dt, toDX, toDY, vx0, vy0, vx1, vy1);
+    this.drawAbilities(ctx, toDX, toDY, vx0, vy0, vx1, vy1);
     this.drawBalls(ctx, toDX, toDY, vx0, vy0, vx1, vy1);
     this.drawArcs(ctx, dt, toDX, toDY);
     this.drawDrop(ctx, toDX, toDY);
@@ -4580,11 +4727,13 @@ registerProcessor('pocket-six', PocketSix);
   R.senseBreaks = function (vx0, vy0, vx1, vy1) {
     const sim = this.sim, white = D.BALLS.length + 1, p = this.byNotes ? 0.14 : 0.4;
     const every = this.byNotes ? 3 : 1;
-    for (let f = 0; f < sim.fxn; f += every) {
+    // A few a frame: a Drone or a Gong breaks dozens at once, and stacked glints white out.
+    for (let f = 0, made = 0; f < sim.fxn && made < 6; f += every) {
       if (this.lights.length > MAX_LIGHTS - 40) break;
       const i = sim.fxI[f], x = i % W, y = (i / W) | 0;
       if (x < vx0 || x > vx1 || y < vy0 || y > vy1) continue;
       this.ping(x + 0.5, y + 0.5, white, p, 0);
+      made++;
     }
   };
 
@@ -4681,6 +4830,89 @@ registerProcessor('pocket-six', PocketSix);
       ctx.rect(cx - r, cy - r, r * 2, r * 2);
     }
     ctx.stroke();
+  };
+
+  // What the balls do, drawn under them: Gong rings, String strings, Echo ghosts, the Drone's
+  // hum, and the chord notes shimmering around a Harmonic.
+  const BK = {};
+  D.BALLS.forEach((b, i) => { BK[b.key] = i; });
+  R.drawAbilities = function (ctx, toDX, toDY, vx0, vy0, vx1, vy1) {
+    const sim = this.sim, z = this.cam.z, dpr = this.dpr, n = sim.n, bt = sim.bt, bx = sim.bx, by = sim.by, m = 60 / z;
+    const inView = (x, y, pad) => x > vx0 - pad && x < vx1 + pad && y > vy0 - pad && y < vy1 + pad;
+    ctx.save();
+    ctx.lineCap = 'round';
+    // Gong: rings of sound, fading as they spread.
+    ctx.strokeStyle = D.BALLS[BK.bomb].color;
+    ctx.lineWidth = Math.max(1, 1.2 * dpr);
+    for (const g of sim.rings) {
+      if (!inView(g.x, g.y, g.R)) continue;
+      ctx.globalAlpha = 0.75 * (1 - g.r / g.R);
+      ctx.beginPath();
+      ctx.arc(toDX(g.x), toDY(g.y), g.r * z * dpr, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    // String: a line between each pair, trembling; slack and faint when too far apart to cut.
+    const L = sim.stringLen, pt = sim.partner, wob = Math.sin(this.time * 38);
+    ctx.strokeStyle = D.BALLS[BK.spark].color;
+    for (let k = 0; k < n; k++) {
+      const j = pt[k];
+      if (bt[k] !== BK.spark || j < k) continue;
+      const x0 = bx[k], y0 = by[k], x1 = bx[j], y1 = by[j], d = Math.hypot(x1 - x0, y1 - y0);
+      if (!inView(x0, y0, m) && !inView(x1, y1, m)) continue;
+      const taut = d <= L;
+      ctx.globalAlpha = taut ? 0.8 : 0.18;
+      ctx.lineWidth = Math.max(1, (taut ? 1.3 : 0.8) * dpr);
+      const mx = (x0 + x1) / 2, my = (y0 + y1) / 2, a = taut ? wob * Math.min(3, d * 0.06) : 0;
+      const nx = d ? -(y1 - y0) / d : 0, ny = d ? (x1 - x0) / d : 0;
+      ctx.beginPath();
+      ctx.moveTo(toDX(x0), toDY(y0));
+      ctx.quadraticCurveTo(toDX(mx + nx * a), toDY(my + ny * a), toDX(x1), toDY(y1));
+      ctx.stroke();
+    }
+    // Echo: a ghost where each one was a second ago.
+    const gs = Math.max(2, Math.min(6, z * 0.9)) * dpr;
+    ctx.strokeStyle = D.BALLS[BK.venom].color;
+    ctx.lineWidth = Math.max(1, dpr);
+    ctx.globalAlpha = 0.45;
+    ctx.beginPath();
+    for (let k = 0; k < n; k++) {
+      if (bt[k] !== BK.venom) continue;
+      const g = sim.ghost(k);
+      if (!inView(g.x, g.y, 4)) continue;
+      ctx.rect(toDX(g.x) - gs / 2, toDY(g.y) - gs / 2, gs, gs);
+    }
+    ctx.stroke();
+    // Drone: its hum, a soft ring breathing in and out.
+    ctx.strokeStyle = D.BALLS[BK.drill].color;
+    ctx.globalAlpha = 0.3 + 0.15 * Math.sin(this.time * 6);
+    ctx.beginPath();
+    const hr = (sim.humR + 0.5) * z * dpr;
+    for (let k = 0; k < n; k++) {
+      if (bt[k] !== BK.drill || !inView(bx[k], by[k], sim.humR)) continue;
+      const cx = toDX(bx[k]), cy = toDY(by[k]);
+      ctx.moveTo(cx + hr, cy);
+      ctx.arc(cx, cy, hr, 0, Math.PI * 2);
+    }
+    ctx.stroke();
+    // Harmonic: rock near it whose note is in the chord shimmers gold.
+    if (z >= 2) {
+      const cells = this.w.cells, R = 9, sz = Math.max(1, z * 0.45) * dpr;
+      ctx.fillStyle = '#ffd640';
+      ctx.globalAlpha = 0.35 + 0.2 * Math.sin(this.time * 5);
+      let shown = 0;
+      for (let k = 0; k < n && shown < 40; k++) {
+        if (bt[k] !== BK.midas || !inView(bx[k], by[k], R)) continue;
+        shown++;
+        const cx = bx[k] | 0, cy = by[k] | 0;
+        for (let y = cy - R; y <= cy + R; y++) for (let x = cx - R; x <= cx + R; x++) {
+          if (x < 0 || y < 0 || x >= W || y >= H) continue;
+          const i = y * W + x, t = cells[i] & MASK;
+          if (!t || t === T.RELIC || this.glow(i, x, y) !== 2 || !sim.inChord(x, y)) continue;
+          ctx.fillRect(toDX(x + 0.5) - sz / 2, toDY(y + 0.5) - sz / 2, sz, sz);
+        }
+      }
+    }
+    ctx.restore();
   };
 
   // Balls are small squares with a fading streak behind them.
@@ -5174,12 +5406,13 @@ registerProcessor('pocket-six', PocketSix);
     unlock: '<circle cx="10" cy="10" r="5"/><path d="M15 3v6M12 6h6"/>',
     dmg: '<path d="M4 16 15 5M13 3l4 4M6 11l3 3M3 17l2-2"/>',
     spd: '<path d="M2 7h7M1 11h8M3 15h6"/><circle cx="14" cy="11" r="4"/>',
-    pierce: '<path d="M2 10h15M13 6l4 4-4 4"/><rect x="7" y="4" width="3" height="12"/>',
-    radius: '<circle cx="10" cy="10" r="3"/><path d="M10 1v4M10 15v4M1 10h4M15 10h4M4 4l2.5 2.5M13.5 13.5 16 16M16 4l-2.5 2.5M4 16l2.5-2.5"/>',
-    spread: '<path d="M10 2c4 5 6 8 6 11a6 6 0 0 1-12 0c0-3 2-6 6-11z"/>',
-    arcs: '<path d="M11 1 4 11h5l-2 8 8-11h-5z"/>',
+    stride: '<path d="M2 10h15M13 6l4 4-4 4"/><path d="M4 5v10M8 5v10"/>',
+    swell: '<circle cx="10" cy="10" r="2.5"/><circle cx="10" cy="10" r="5.5"/><circle cx="10" cy="10" r="8.5"/>',
+    decay: '<circle cx="5" cy="10" r="3"/><circle cx="11" cy="10" r="2.2"/><circle cx="16" cy="10" r="1.4"/>',
+    tension: '<circle cx="3" cy="10" r="2"/><circle cx="17" cy="10" r="2"/><path d="M5 10c2-3 3 3 5 0s3 3 5 0"/>',
     mult: '<circle cx="10" cy="10" r="7"/><path d="M7 7l6 6M13 7l-6 6"/>',
-    steer: '<circle cx="10" cy="10" r="7"/><circle cx="10" cy="10" r="2.5"/>',
+    hum: '<circle cx="10" cy="10" r="2.5"/><path d="M5 5a7 7 0 0 0 0 10M15 5a7 7 0 0 1 0 10"/>',
+    call: '<circle cx="10" cy="10" r="2.5"/><path d="M3 3l4 4M17 3l-4 4M3 17l4-4M17 17l-4-4"/>',
   };
   const icon = k => `<svg viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${ICON[k]}</svg>`;
   const nodeIcon = (b, kind) => icon(kind === 'sp' ? b.special.key : kind);
@@ -5244,7 +5477,8 @@ registerProcessor('pocket-six', PocketSix);
     if (kind === 'dmg') return `${fmt(b.dmg * Math.pow(TR.dmg.mult, lv))} damage`;
     if (kind === 'spd') return `+${Math.round(TR.spd.step * lv * 100)}% speed`;
     const v = b.special.base + b.special.step * lv;
-    return { pierce: `${v} pixels`, radius: `${v} px blast`, spread: `${4 + 2 * v} generations`, arcs: `${v} arcs`, mult: `${v}× payout`, steer: `${v}× steering` }[b.special.key];
+    return { stride: `+${35 * v}% dash`, swell: `${D.GONG_REACH + 8 * v} px ring`, decay: `${v} echo${v === 1 ? '' : 'es'}`, tension: `${v} px string`,
+      mult: `${v}× on chord notes`, hum: `${v} px hum`, call: `calls from ${v} px` }[b.special.key];
   };
 
   // The card above the tree: the selected node, its next level and the buy button.
@@ -5843,7 +6077,7 @@ registerProcessor('pocket-six', PocketSix);
 // Stonesong: boot, game loop, autosave, and the music.
 (function () {
   const PQ = window.PQ, D = PQ.DATA;
-  const BUILD = '20261029-125801';                       // build.py stamps the build time here
+  const BUILD = '20261029-133702';                       // build.py stamps the build time here
   const $ = id => document.getElementById(id);
   const canvas = $('world');
   const yieldFrame = () => new Promise(r => setTimeout(r, 0));
