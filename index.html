@@ -2343,6 +2343,11 @@ body.listening .hud > * { pointer-events: none; }
       this.spawn(t, x, y);
       const vx = arr[o + 2], vy = arr[o + 3], l = Math.hypot(vx, vy);
       if (l > 0.5) { this.vx[k] = vx / l; this.vy[k] = vy / l; }
+      // A Pulse keeps to the axes (one saved while it could move any way snaps to the nearest).
+      if (t === B.lancer && this.vx[k] && this.vy[k]) {
+        const ax = Math.abs(this.vx[k]) >= Math.abs(this.vy[k]);
+        this.vx[k] = ax ? Math.sign(this.vx[k]) : 0; this.vy[k] = ax ? 0 : Math.sign(this.vy[k]);
+      }
     }
   };
   // Balls the player owns but that are not in the world (first start, lost save).
@@ -6121,7 +6126,7 @@ registerProcessor('pocket-six', PocketSix);
 // Stonesong: boot, game loop, autosave, and the music.
 (function () {
   const PQ = window.PQ, D = PQ.DATA;
-  const BUILD = '20261029-153604';                       // build.py stamps the build time here
+  const BUILD = '20261029-153733';                       // build.py stamps the build time here
   const $ = id => document.getElementById(id);
   const canvas = $('world');
   const yieldFrame = () => new Promise(r => setTimeout(r, 0));
