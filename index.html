@@ -698,7 +698,7 @@ body.listening .hud > * { pointer-events: none; }
     FOG: 4,                                 // fog-of-war cell edge, world px (code shifts by 2: keep it 4)
     SIGHT: 20,                              // how far a ball lights up the rock around it, px
     RELIC_REWARD_S: 30,                     // a relic find pays this many seconds of income
-    RELIC_SHOW: 0.65,                       // once this much of a relic's outline is seen, all of it shows
+    RELIC_SHOW: 0.6,                        // once this much of a relic's outline is seen, all of it shows and it is found
     TYPE_MASK: 0x0f,
     POISON: 0x80,
 
@@ -1661,12 +1661,13 @@ body.listening .hud > * { pointer-events: none; }
         // The renderer blends across cell edges, so neighbouring tiles may change too.
         this.dirty(Math.max(0, cx * 4 - 4), Math.max(0, cy * 4 - 4));
         this.dirty(Math.min(W - 1, cx * 4 + 7), Math.min(H - 1, cy * 4 + 7));
-        if (old < 160 && nv >= 160 && w.relicCell[k]) { this.discover(w.relicCell[k] - 1); this.showRelic(w.relicCell[k] - 1); }
+        if (old < 160 && nv >= 160 && w.relicCell[k]) this.showRelic(w.relicCell[k] - 1);
       }
     }
   };
-  // Once most of a relic's outline has been seen, the fog lifts off all of it: the far side of
-  // a big one may sit against rock no ball will reach.
+  // Once most of a relic's outline has been seen, the whole relic appears (just its own pixels:
+  // the rock around it stays in the fog), and only then is it found: its bonus and its story
+  // fragment. The far side of a big one may sit against rock no ball will reach.
   P.showRelic = function (i) {
     const w = this.w, fog = w.fog, edge = w.relicEdge && w.relicEdge[i];
     if (!edge || this.relicShown[i]) return;
@@ -1676,13 +1677,10 @@ body.listening .hud > * { pointer-events: none; }
     this.relicShown[i] = 1;
     const all = w.relicFog[i], FW = w.FW;
     for (let q = 0; q < all.length; q++) {
-      const k = all[q];
-      if (fog[k] === 255) continue;
-      fog[k] = 255;
-      const cx = k % FW, cy = (k / FW) | 0;
-      this.dirty(Math.max(0, cx * 4 - 4), Math.max(0, cy * 4 - 4));
-      this.dirty(Math.min(W - 1, cx * 4 + 7), Math.min(H - 1, cy * 4 + 7));
+      const cx = all[q] % FW, cy = (all[q] / FW) | 0;
+      this.dirty(cx * 4, cy * 4);
     }
+    this.discover(i);
   };
 
   // A ball lights the rock around it. Skipped when everything in reach is already seen.
@@ -4643,6 +4641,8 @@ registerProcessor('pocket-six', PocketSix);
   R.pixel = function (i, x, y, fog) {
     const cells = this.w.cells, c = cells[i], t = c & MASK;
     if (t === T.UPGRADE) return UP_COL;                  // seen through the dark
+    // A relic shows whole once found, through the fog that still hides the rock around it.
+    if (t === T.RELIC && fog < 255 && this.sim && this.sim.relicShown[this.w.relicCell[(y >> 2) * this.w.FW + (x >> 2)] - 1]) fog = 255;
     if (fog < 96) return DEEP;
     if (!t) return BG;
     const f = fog >= 255 ? 3 : (fog - 96) * 4 / 160 | 0;
@@ -6158,7 +6158,7 @@ registerProcessor('pocket-six', PocketSix);
 // Stonesong: boot, game loop, autosave, and the music.
 (function () {
   const PQ = window.PQ, D = PQ.DATA;
-  const BUILD = '20261029-160148';                       // build.py stamps the build time here
+  const BUILD = '20261029-200350';                       // build.py stamps the build time here
   const $ = id => document.getElementById(id);
   const canvas = $('world');
   const yieldFrame = () => new Promise(r => setTimeout(r, 0));
