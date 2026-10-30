@@ -734,15 +734,16 @@ body.listening .hud > * { pointer-events: none; }
     UPGRADES: { count: 240, near: 5, dia: f => 1 + Math.floor(f) },
 
     // Ball types. speed in world px/s, dmg per hit, cost = bits for one more.
+    // They come in by cost (PQ.ballOrder), not by their place here.
     // Every type but the Ping is unlocked in the skill tree with diamonds. Keys are the old
     // names (saves, the tree and the music go by key); what each one does is its own.
     BALLS: [
       { key: 'pebble', name: 'Ping', color: '#e9e4d6', dmg: 1,  speed: 46,  cost: 15,
         desc: 'Bounces around and chips whatever it hits.' },
-      { key: 'lancer', name: 'Pulse', color: '#38c8ff', dmg: 3,  speed: 120, cost: 300,
+      { key: 'lancer', name: 'Pulse', color: '#38c8ff', dmg: 3,  speed: 120, cost: 2e6,   // comes after the Harmonic: too strong this early
         desc: 'Only travels in straight lines. Cuts long, clean tunnels.',
         special: { key: 'pierce', name: 'Pierce', desc: 'Keeps going through more broken pixels', max: 6, base: 0, step: 2 } },
-      { key: 'bomb',   name: 'Gong',   color: '#ff5a48', dmg: 2,  speed: 50,  cost: 2800,
+      { key: 'bomb',   name: 'Gong',   color: '#ff5a48', dmg: 2,  speed: 50,  cost: 800,
         desc: 'On impact it sends out a ring of sound that chips the first rock it meets in every direction, then rings back up.',
         special: { key: 'swell', name: 'Swell', desc: 'The ring reaches further, strikes more rock and cuts deeper', max: 6, base: 0, step: 1 } },
       { key: 'venom',  name: 'Echo', plural: 'Echoes', color: '#6fe05a', dmg: 2,  speed: 52,  cost: 40000,
@@ -775,7 +776,7 @@ body.listening .hud > * { pointer-events: none; }
     // unlock it, then Damage, Speed and its special. costs[level] is the price of the next level.
     // Unlocking also costs UNLOCK_MULT x the ball's bit price, and the first ball comes with it.
     TREE: {
-      unlock: { pebble: 0, lancer: 1, bomb: 2, venom: 4, spark: 6, midas: 8, drill: 20, seeker: 50 },
+      unlock: { pebble: 0, bomb: 1, venom: 4, spark: 6, midas: 8, lancer: 12, drill: 20, seeker: 50 },
       dmg: { name: 'Damage', mult: 1.6, costs: [2, 3, 4, 6, 8, 11, 15, 20] },
       spd: { name: 'Speed', step: 0.2, costs: [2, 4, 6, 9] },
       sp:  { costs: [3, 5, 8, 12, 16, 20] },
@@ -1506,6 +1507,9 @@ body.listening .hud > * { pointer-events: none; }
   const TS = Math.log2(D.TILE);
   const B = {};
   BALLS.forEach((b, i) => { B[b.key] = i; });
+  // The order types come in, cheapest first. Saves store a ball's type by its index in BALLS,
+  // so a type moves later by its price, not by its place in the list.
+  const ballOrder = () => BALLS.map((b, i) => i).sort((a, b) => BALLS[a].cost - BALLS[b].cost);
 
   // How many ownership milestones a count has passed, and the next one (or 0 when done).
   function milestone(owned) {
@@ -2463,6 +2467,7 @@ body.listening .hud > * { pointer-events: none; }
   PQ.perkSpent = perkSpent;
   PQ.milestone = milestone;
   PQ.BALL = B;
+  PQ.ballOrder = ballOrder;
 })();
 
 </script>
@@ -5448,7 +5453,7 @@ registerProcessor('pocket-six', PocketSix);
 // Stonesong: the DOM layer. HUD, shop sheet, toasts and dialogs.
 (function () {
   const PQ = window.PQ;
-  const D = PQ.DATA, BALLS = D.BALLS;
+  const D = PQ.DATA, BALLS = D.BALLS, ORDER = PQ.ballOrder();   // shop and tree list types cheapest first
   const $ = id => document.getElementById(id);
   const UNITS = ['K', 'M', 'B', 'T', 'Qa', 'Qi', 'Sx', 'Sp', 'Oc', 'No', 'Dc'];
 
@@ -5504,7 +5509,7 @@ registerProcessor('pocket-six', PocketSix);
       <div class="buyrow"><span>Buy amount</span>
         <div class="buymode" id="buymode" role="group" aria-label="How many to buy">
           <button type="button" data-n="1">×1</button><button type="button" data-n="10">×10</button><button type="button" data-n="0">Max</button>
-        </div></div>` + BALLS.map((b, t) => `
+        </div></div>` + ORDER.map(t => [BALLS[t], t]).map(([b, t]) => `
       <div class="row ball" id="ball-${t}">
         <span class="swatch" style="--c:${b.color}"></span>
         <div><div class="name"><span id="bn-${t}">${esc(b.name)}</span><span class="count" id="bc-${t}"></span></div>
@@ -5522,8 +5527,8 @@ registerProcessor('pocket-six', PocketSix);
     this.shown = this.g.state.bits;
 
     // Tree: one branch per ball type, paid in diamonds.
-    if (!this.sel) this.sel = { t: 1, kind: 'unlock' };
-    $('panel-tree').innerHTML = `<div class="treecard" id="treeCard"></div><div class="tree">` + BALLS.map((b, t) => `
+    if (!this.sel) this.sel = { t: ORDER[1], kind: 'unlock' };
+    $('panel-tree').innerHTML = `<div class="treecard" id="treeCard"></div><div class="tree">` + ORDER.map(t => [BALLS[t], t]).map(([b, t]) => `
       <div class="branch" id="br-${t}" style="--c:${b.color}">
         ${this.g.sim.nodeKinds(t).map(k => `
           <button type="button" class="node${k === 'unlock' ? ' root' : ''}" id="nd-${t}-${k}" data-act="node" data-t="${t}" data-kind="${k}" aria-label="${esc(b.name)} ${esc(this.nodeName(t, k))}">
@@ -5995,7 +6000,7 @@ registerProcessor('pocket-six', PocketSix);
     $('dia').textContent = `◆ ${s.dia}`;
     // Balls: unlocked ones can be bought; the rest point at the Tree.
     const full = sim.n >= D.MAX_BALLS;
-    const next = BALLS.findIndex((b, t) => !sim.unlocked(t));
+    const next = ORDER.find(t => !sim.unlocked(t));
     BALLS.forEach((b, t) => {
       if (this.tab !== 'balls') return;
       const unlocked = sim.unlocked(t), hidden = !unlocked && t !== next;
@@ -6158,7 +6163,7 @@ registerProcessor('pocket-six', PocketSix);
 // Stonesong: boot, game loop, autosave, and the music.
 (function () {
   const PQ = window.PQ, D = PQ.DATA;
-  const BUILD = '20261029-215259';                       // build.py stamps the build time here
+  const BUILD = '20261030-082840';                       // build.py stamps the build time here
   const $ = id => document.getElementById(id);
   const canvas = $('world');
   const yieldFrame = () => new Promise(r => setTimeout(r, 0));
