@@ -746,7 +746,7 @@ body.listening .hud > * { pointer-events: none; }
     // Depths with a look of their own, in place of the four above. Blackout: every pixel is the
     // upgrade pixels' magenta and the cave is pitch dark; only hits (notes, breaks) light it.
     SPECIAL_LOOKS: {
-      25: { name: 'Blackout', blackout: true, void: [0, 0, 0], deep: [0, 0, 0], night: [0, 0, 0], rock: {} },
+      26: { name: 'Blackout', blackout: true, void: [0, 0, 0], deep: [0, 0, 0], night: [0, 0, 0], rock: {} },
     },
     lookOf: d => PQ.DATA.SPECIAL_LOOKS[d] || PQ.DATA.LOOKS[(d || 0) % PQ.DATA.LOOKS.length],
     // Hardness tiers from the centre outward; each pixel may be one tier softer or harder.
@@ -6194,7 +6194,7 @@ registerProcessor('pocket-six', PocketSix);
 // Stonesong: boot, game loop, autosave, and the music.
 (function () {
   const PQ = window.PQ, D = PQ.DATA;
-  const BUILD = '20261108-153131';                       // build.py stamps the build time here
+  const BUILD = '20261108-153313';                       // build.py stamps the build time here
   const $ = id => document.getElementById(id);
   const canvas = $('world');
   const yieldFrame = () => new Promise(r => setTimeout(r, 0));
